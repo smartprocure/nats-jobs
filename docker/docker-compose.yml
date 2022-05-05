@@ -1,0 +1,46 @@
+version: "3.4"
+services:
+  nats-server:
+    image: nats:latest
+    ports:
+      - 4222:4222
+      - 8222:8222
+      - 6222:6222
+    networks:
+      - nats
+    restart: unless-stopped
+    command: ['-js', '-sd', "/nats-storage", '-m', '8222']
+    volumes:
+      - nats_volume:/nats-storage
+  nats-prometheus-exporter:
+    image: natsio/prometheus-nats-exporter:latest
+    ports:
+      - 7777:7777
+    networks:
+      - nats
+    restart: unless-stopped
+    command: ['-varz', '-subz', "-serverz", '-connz', '-channelz', '-jsz', 'all', 'http://nats-server:8222']
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - 9090:9090
+    networks:
+      - nats
+    restart: unless-stopped
+    volumes:
+      - ./prometheus:/etc/prometheus
+      - prometheus_volume:/prometheus
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_volume:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+volumes:
+  nats_volume:
+  prometheus_volume:
+  grafana_volume:
+
+networks:
+  nats:

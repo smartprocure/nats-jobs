@@ -1,0 +1,10 @@
+apiVersion: 1
+
+datasources:
+  - name: NATSPrometheus
+    type: prometheus
+    access: proxy # this option is not loading correctly and has to be manually adjusted in the Grafana UI
+    url: http://localhost:9090
+    isDefault: true
+    version: 1
+    editable: true

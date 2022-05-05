@@ -1,0 +1,12 @@
+global:
+  scrape_interval: 5s
+  external_labels:
+    monitor: 'nats-server'
+
+# A scrape configuration containing exactly one endpoint to scrape:
+scrape_configs:
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  - job_name: 'nats-server'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['nats-prometheus-exporter:7777']
