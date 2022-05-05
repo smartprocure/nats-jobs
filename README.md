@@ -1,3 +1,3 @@
-# NATS Playground
+# NATS Jobs
 
-Experiments in creating a job system using NATS and some Redis.
+Background job processing system using NATS and optionally Redis.
