@@ -1,16 +1,28 @@
 {
   "name": "nats-jobs",
   "version": "0.0.1",
-  "description": "Background job processor using NATS and optionally Redis",
-  "main": "index.js",
+  "description": "Background job processor using NATS and Redis",
+  "author": "GovSpend",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "prepare": "npm run build",
     "build": "tsc --declaration",
     "test": "npm run lint",
     "lint": "eslint src/**"
   },
-  "keywords": [],
-  "author": "David",
+  "keywords": [
+    "NATS",
+    "Redis",
+    "job",
+    "worker",
+    "background",
+    "processing",
+    "scheduler"
+  ],
+  "engines": {
+    "node": ">=16.0.0"
+  },
   "license": "ISC",
   "dependencies": {
     "debug": "^4.3.4",

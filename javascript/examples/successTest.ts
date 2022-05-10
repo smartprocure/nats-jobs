@@ -2,6 +2,12 @@
  * Demonstrates a successful job and how to gracefully shut down
  * without interrupting a short-lived job.
  *
+ * To Test:
+ *
+ * (1) Run script: npx ts-node examples/successTest.ts
+ * (2) Publish multiple messages: nats pub ORDERS someText
+ * (3) Crl-C the script in the middle of processing the messages.
+ *
  * Requires NATS to be running.
  */
 import { JsMsg } from 'nats'
@@ -11,9 +17,10 @@ import jobProcessor from '../src/jobProcessor'
 const def = {
   stream: 'ORDERS',
   backoff: [1000, 2000, 4000, 8000],
-  async perform(msg: JsMsg, signal: AbortSignal) {
+  async perform(msg: JsMsg) {
     console.log(`Started ${msg.info.streamSequence}`)
     console.log(msg.data.toString())
+    // Simulate work
     await setTimeout(5000)
     console.log(`Completed ${msg.info.streamSequence}`)
   },
