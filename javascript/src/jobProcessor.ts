@@ -9,7 +9,6 @@ import {
   ReplayPolicy,
   RetentionPolicy,
   StorageType,
-  StreamInfo,
 } from 'nats'
 import { nanos, defer } from './util'
 import _debug from 'debug'
@@ -65,14 +64,12 @@ const createConsumer = (conn: NatsConnection, def: JobDef) => {
   })
 }
 
-const defaults = { backoff: 1000, pullInterval: 1000, batch: 10 }
-
 const jobProcessor = async (opts?: NatsOpts) => {
   const { natsOpts } = opts || {}
   const conn = await connect(natsOpts)
   let timer: NodeJS.Timer
   let deferred: Deferred<void>
-  let abortController = new AbortController()
+  const abortController = new AbortController()
 
   /**
    * Start processing jobs based on def.
@@ -85,7 +82,7 @@ const jobProcessor = async (opts?: NatsOpts) => {
     const batch = def.batch ?? 10
     // Create stream
     // TODO: Maybe handle errors better
-    await createStream(conn, def).catch(() => {})
+    await createStream(conn, def).catch()
     // Create pull consumer
     const ps = await createConsumer(conn, def)
     // Pull messages from the consumer
@@ -97,7 +94,7 @@ const jobProcessor = async (opts?: NatsOpts) => {
     // Pull regularly
     timer = setInterval(run, pullInterval)
     // Consume messages
-    for await (let msg of ps) {
+    for await (const msg of ps) {
       debug('RECEIVED', msg.info)
       deferred = defer()
       try {
@@ -107,7 +104,7 @@ const jobProcessor = async (opts?: NatsOpts) => {
         await msg.ackAck()
       } catch (e) {
         debug('FAILED', e)
-        let backoffMs = getNextBackoff(backoff, msg)
+        const backoffMs = getNextBackoff(backoff, msg)
         debug('NEXT BACKOFF MS', backoffMs)
         // Negative ack message with backoff
         msg.nak(backoffMs)

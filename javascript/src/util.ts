@@ -1,10 +1,5 @@
-import { setInterval } from 'node:timers/promises'
 import ms from 'ms'
-import _debug from 'debug'
-import { JsMsg } from 'nats'
 import { Deferred } from './types'
-
-const debug = _debug('nats')
 
 export const nanos = (x: string) => ms(x) * 1e6
 
@@ -22,6 +17,7 @@ export const expBackoff = (
 }
 
 export function defer<A>(): Deferred<A> {
+  // eslint-disable-next-line
   let done = (value: A) => {}
   const promise = new Promise<A>((res) => {
     done = res
