@@ -5,7 +5,7 @@ import ms from 'ms'
 import _debug from 'debug'
 import { Recurring, RedisOpts, NatsOpts, Delayed } from './types'
 
-const debug = _debug('nats')
+const debug = _debug('nats-jobs')
 
 const jobScheduler = async (opts?: RedisOpts & NatsOpts) => {
   const { natsOpts, redisOpts } = opts || {}

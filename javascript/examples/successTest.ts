@@ -13,10 +13,11 @@
 import { JsMsg } from 'nats'
 import { setTimeout } from 'node:timers/promises'
 import jobProcessor from '../src/jobProcessor'
+import { expBackoff } from '../src/util'
 
 const def = {
   stream: 'ORDERS',
-  backoff: [1000, 2000, 4000, 8000],
+  backoff: expBackoff(1000),
   async perform(msg: JsMsg) {
     console.log(`Started ${msg.info.streamSequence}`)
     console.log(msg.data.toString())

@@ -14,7 +14,7 @@ import { nanos, defer } from './util'
 import _debug from 'debug'
 import { Deferred, NatsOpts, JobDef } from './types'
 
-const debug = _debug('nats')
+const debug = _debug('nats-jobs')
 
 const getNextBackoff = (backoff: number | number[], msg: JsMsg) => {
   if (Array.isArray(backoff)) {

@@ -5,6 +5,7 @@
   "author": "GovSpend",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "repository": "git://github.com/smartprocure/nats-jobs.git",
   "scripts": {
     "prepare": "npm run build",
     "build": "tsc --declaration",
