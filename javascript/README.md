@@ -15,6 +15,10 @@ This library uses [debug](https://www.npmjs.com/package/debug). To enable:
 DEBUG=nats-jobs node myfile.js
 ```
 
+[msgpackr](https://www.npmjs.com/package/msgpackr) is the recommended way
+to encode complex data structures since it's fast, efficient, and can handle
+serializing and unserializing dates.
+
 ### Processing jobs
 
 ```typescript
