@@ -10,6 +10,11 @@ See examples directory for more examples.
 
 ## Usage
 
+This library uses [debug](https://www.npmjs.com/package/debug). To enable:
+```
+DEBUG=nats-jobs node myfile.js
+```
+
 ### Processing jobs
 
 ```typescript
