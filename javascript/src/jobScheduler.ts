@@ -49,7 +49,7 @@ const jobScheduler = async (opts?: RedisOpts & NatsOpts) => {
    * Returns a boolean indicating if the job was successfully scheduled.
    */
   const scheduleDelayed = async ({ scheduleFor, subject, data }: Delayed) => {
-    const key = `${subject}:delayed`
+    const key = `delayed:${subject}`
     const score =
       typeof scheduleFor === 'number'
         ? new Date().getTime() + scheduleFor
@@ -65,7 +65,7 @@ const jobScheduler = async (opts?: RedisOpts & NatsOpts) => {
    * Guarantees at least one delivery.
    */
   const publishDelayed = (subject: string, interval: number = ms('5s')) => {
-    const key = `${subject}:delayed`
+    const key = `delayed:${subject}`
     setInterval(async () => {
       const upper = new Date().getTime()
       // Get delayed jobs where the delayed timestamp is <= now

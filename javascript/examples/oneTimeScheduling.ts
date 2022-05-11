@@ -3,15 +3,14 @@
  *
  * Requires NATS and Redis to be running.
  */
-import { JsMsg, StringCodec } from 'nats'
-import { setTimeout } from 'node:timers/promises'
+import { StringCodec } from 'nats'
 import ms from 'ms'
 import jobProcessor from '../src/jobProcessor'
 import jobScheduler from '../src/jobScheduler'
 
 const def = {
   stream: 'ORDERS',
-  async perform(msg: JsMsg) {
+  async perform() {
     console.log('Processing: %s', new Date())
   },
 }
