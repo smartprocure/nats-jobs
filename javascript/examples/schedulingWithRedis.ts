@@ -19,7 +19,7 @@ const run = async () => {
   scheduler.scheduleRecurring({
     id: 'ordersEvery5s',
     rule: '*/5 * * * * *',
-    subject: 'ORDERS.US',
+    subject: 'ORDERS',
     data: (date: Date) => sc.encode(`${date} : ${process.pid}`),
   })
 }

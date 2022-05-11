@@ -18,7 +18,7 @@ const run = async () => {
   schedule.scheduleJob('*/5 * * * * *', (date) => {
     console.log(`(${counter++}) Scheduling ${date}`)
     const msgID = date.getTime().toString()
-    js.publish('ORDERS.job', sc.encode(`${date} ${process.pid}`), { msgID })
+    js.publish('ORDERS', sc.encode(`${date} ${process.pid}`), { msgID })
   })
 }
 
