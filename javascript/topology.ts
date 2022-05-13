@@ -91,19 +91,6 @@ POST /topology
 GET /topology?id=samGov&status=running
 */
 
-download -> process
-{date: '2021-01-03', data:...}
-{date: '2021-01-04', data:...}
-...
-{date: '2021-12-31', data:...}
-
-{
-  startDate: '2021-01-01',
-  endDate: '2021-12-31'
-}
-
-
-
 // MongoDB topology collection record
 let mongo = {
   topologyId: 'samGov',
