@@ -20,16 +20,53 @@ let topology = {
     },
   },
   dag: {
-    api: {
-      runner: 'api',
-      dependencies: [],
-    },
-    apiDetails: {
-      runner: 'details',
-      dependencies: ['api'],
-    },
+    // input: path, storage type (gcs, filesystem)
+    // output: list of paths
+    // artifacts: files in the storage
+    downloadFiles: { deps: [] },
+
+    // input: path, storage type (gcs, filesystem)
+    // output: mongo id pointing to the artifact
+    // artifacts: list of ids (size of 400k)
+    processFile: { deps: ['downloadFiles'] },
+
+    // input: start,end
+    // output: list of ids
+    // artifacts: records in mongo
+    api: { deps: [] },
+
+    // input: mongo id
+    // output: mongo id
+    // artifacts: records in mongo, list of ids
+    // state: { cursor: id }
+    history: { deps: ['api', 'processFile'] },
+
+    // input: mongo id
+    // output: mongo id
+    // artifacts: records in mongo
+    // state: { cursor: id }
+    downloadStuff: { deps: ['api', 'history', 'processFile'] },
+
+    // input: mongo id
+    // output: mongo id
+    // artifacts: records in mongo
+    // state: { cursor: id }
+    details: { deps: ['downloadStuff'] },
+
+    // input: mongo id
+    // output: mongo id
+    // artifacts: records in mongo
+    // state: { cursor: id }
+    attachments: { deps: ['downloadStuff'] },
+
+    // input: mongo id
+    // artifacts: records in mongo
+    // state: { cursor: id }
+    mongo: { deps: ['details', 'attachments'] },
   },
 }
+
+// pseudo-code: difference(list of this topology ids, list of ids processed ever for this particular job)
 
 interface Topology {
   id: string
