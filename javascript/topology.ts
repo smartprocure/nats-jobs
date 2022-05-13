@@ -11,7 +11,7 @@ let topology = {
   },
   runners: {
     api: {
-      run: ({ resources, data }) => {},
+      run: ({ resources, data, updateStateFn }) => {},
     },
     details: {
       run: ({ resources, data }) => {},
@@ -54,12 +54,25 @@ POST /topology
 GET /topology?id=samGov&status=running
 */
 
+download -> process
+{date: '2021-01-03', data:...}
+{date: '2021-01-04', data:...}
+...
+{date: '2021-12-31', data:...}
+
+{
+  startDate: '2021-01-01',
+  endDate: '2021-12-31'
+}
+
+
+
 // MongoDB topology collection record
 let mongo = {
   topologyId: 'samGov',
-  includesNodes: ['api', 'apiDetails'],
+  includesNodes: ['apiDetails', 'whateverDetails'],
   status: 'running',
-  runningNodes: ['apiDetails'],
+  runningNodes: ['api'],
   dag: {
     api: {
       runner: 'api',
@@ -69,12 +82,22 @@ let mongo = {
       runner: 'details',
       dependencies: ['api'],
     },
+    whateverDetails: {
+      runner: 'details',
+      dependencies: ['api'],
+    },
+  },
+  state: {
+    api: {
+      date: '2020-04-01',
+      id: '123'
+    }
   },
   data: {
     api: {
       input: {
-        startDate: new Date('2020-01-01'),
-        endDate: new Date('2020-01-01'),
+        startDate: '2020-01-01',
+        endDate: '2020-12-31',
       },
       output: ['123', '456'],
     },
