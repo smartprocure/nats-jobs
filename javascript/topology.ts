@@ -12,7 +12,7 @@ let topology = {
   nodes: {
     api: {
       run: ({ resources, data, updateStateFn }) => {},
-      resources: []
+      resources: [],
     },
     details: {
       run: ({ resources, data }) => {},
@@ -69,8 +69,30 @@ let topology = {
 
 // pseudo-code: difference(list of this topology ids, list of ids processed ever for this particular job)
 
+interface Resource<A> {
+  init(): Promise<A>
+}
+
+type Resources = Record<string, Resource<any>>
+type UpdateStateFn = (state: any) => void
+
+interface NodeDef {
+  run({
+    resources: Resources,
+    data: any,
+    updateStateFn: UpdateStateFn,
+  }): Promise<any>
+  shouldRun?({ resources: Resources, data: any }): boolean
+  resources?: string[]
+}
+type Nodes = Record<string, NodeDef>
+type DAG = Record<string, { deps: string[] }>
+
 interface Topology {
   id: string
+  resources?: Resources
+  nodes: Nodes
+  dag: DAG
 }
 
 interface Options {
@@ -79,7 +101,30 @@ interface Options {
   data?: any // Fed into starting nodes (i.e., nodes with no dependencies)
 }
 
-const processTopology = (topology: Topology, options: Options) => {}
+const runTopology = async (topology: Topology, options?: Options) => {
+  const foo: number = await topology.resources.foo.init()
+}
+
+runTopology({
+  id: 'foo',
+  resources: {
+    foo: {
+      init: async () => {
+        return 3
+      },
+    },
+  },
+  nodes: {
+    api: {
+      async run() {},
+    },
+  },
+  dag: {
+    api: { deps: [] },
+    details: { deps: ['api'] },
+    history: { deps: ['api'] },
+  },
+})
 
 // Feathers service
 /*
@@ -99,24 +144,15 @@ let mongo = {
   status: 'running',
   runningNodes: ['details'],
   dag: {
-    api: {
-      runner: 'api',
-      dependencies: [],
-    },
-    details: {
-      runner: 'details',
-      dependencies: ['api'],
-    },
-    history: {
-      runner: 'details',
-      dependencies: ['api'],
-    },
+    api: { deps: [] },
+    details: { deps: ['api'] },
+    history: { deps: ['api'] },
   },
   state: {
     api: {
       date: '2020-04-01',
-      id: '123'
-    }
+      id: '123',
+    },
   },
   data: {
     api: {
@@ -128,9 +164,9 @@ let mongo = {
     },
     details: {
       // Input should always be a ref when there is a previous stage with an output
-      input: {'$ref': '#/data/api/output'},
+      input: { $ref: '#/data/api/output' },
       // Output should always be a ref when input === output
-      output: {'$ref': '#/data/api/output'},
+      output: { $ref: '#/data/api/output' },
     },
   },
 }
