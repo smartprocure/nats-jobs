@@ -9,9 +9,10 @@ let topology = {
       init: () => {},
     },
   },
-  runners: {
+  nodes: {
     api: {
       run: ({ resources, data, updateStateFn }) => {},
+      resources: []
     },
     details: {
       run: ({ resources, data }) => {},
@@ -35,31 +36,31 @@ let topology = {
     // artifacts: records in mongo
     api: { deps: [] },
 
-    // input: mongo id
-    // output: mongo id
+    // input: list of ids
+    // output: list of ids
     // artifacts: records in mongo, list of ids
     // state: { cursor: id }
     history: { deps: ['api', 'processFile'] },
 
-    // input: mongo id
-    // output: mongo id
+    // input: list of ids
+    // output: list of ids
     // artifacts: records in mongo
     // state: { cursor: id }
     downloadStuff: { deps: ['api', 'history', 'processFile'] },
 
-    // input: mongo id
-    // output: mongo id
+    // input: list of ids
+    // output: list of ids
     // artifacts: records in mongo
     // state: { cursor: id }
     details: { deps: ['downloadStuff'] },
 
-    // input: mongo id
-    // output: mongo id
+    // input: list of ids
+    // output: list of ids
     // artifacts: records in mongo
     // state: { cursor: id }
     attachments: { deps: ['downloadStuff'] },
 
-    // input: mongo id
+    // input: list of ids
     // artifacts: records in mongo
     // state: { cursor: id }
     mongo: { deps: ['details', 'attachments'] },
@@ -93,20 +94,20 @@ GET /topology?id=samGov&status=running
 
 // MongoDB topology collection record
 let mongo = {
-  topologyId: 'samGov',
-  includesNodes: ['apiDetails', 'whateverDetails'],
+  id: 'samGov',
+  includesNodes: ['api', 'details'],
   status: 'running',
-  runningNodes: ['api'],
+  runningNodes: ['details'],
   dag: {
     api: {
       runner: 'api',
       dependencies: [],
     },
-    apiDetails: {
+    details: {
       runner: 'details',
       dependencies: ['api'],
     },
-    whateverDetails: {
+    history: {
       runner: 'details',
       dependencies: ['api'],
     },
@@ -125,8 +126,11 @@ let mongo = {
       },
       output: ['123', '456'],
     },
-    apiDetails: {
-      input: ['123', '456'],
+    details: {
+      // Input should always be a ref when there is a previous stage with an output
+      input: {'$ref': '#/data/api/output'},
+      // Output should always be a ref when input === output
+      output: {'$ref': '#/data/api/output'},
     },
   },
 }
