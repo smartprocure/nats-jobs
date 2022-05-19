@@ -12,10 +12,11 @@
 import { JsMsg } from 'nats'
 import { setTimeout } from 'node:timers/promises'
 import jobProcessor from '../src/jobProcessor'
+import { PerformOpts } from '../src/types'
 
 const def = {
   stream: 'ORDERS',
-  async perform(msg: JsMsg, signal: AbortSignal) {
+  async perform(msg: JsMsg, { signal }: PerformOpts) {
     console.log(`Started ${msg.info.streamSequence}`)
     for (let i = 0; i < 5; i++) {
       await setTimeout(1000)

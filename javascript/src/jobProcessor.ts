@@ -67,6 +67,7 @@ const createConsumer = (conn: NatsConnection, def: JobDef) => {
 const jobProcessor = async (opts?: NatsOpts) => {
   const { natsOpts } = opts || {}
   const conn = await connect(natsOpts)
+  const js = conn.jetstream()
   let timer: NodeJS.Timer
   let deferred: Deferred<void>
   const abortController = new AbortController()
@@ -98,7 +99,7 @@ const jobProcessor = async (opts?: NatsOpts) => {
       debug('RECEIVED', msg.info)
       deferred = defer()
       try {
-        await def.perform(msg, abortController.signal, def)
+        await def.perform(msg, { signal: abortController.signal, def, js })
         debug('COMPLETED')
         // Ack message
         await msg.ackAck()
@@ -135,7 +136,7 @@ const jobProcessor = async (opts?: NatsOpts) => {
     clearInterval(timer)
     return deferred?.promise
   }
-  return { start, stop }
+  return { start, stop, js }
 }
 
 export default jobProcessor
