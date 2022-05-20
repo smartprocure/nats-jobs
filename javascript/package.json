@@ -17,12 +17,15 @@
     "lint": "eslint src/**"
   },
   "keywords": [
-    "NATS",
-    "Redis",
+    "nats",
+    "messaging",
+    "queue",
+    "redis",
     "job",
     "worker",
     "background",
     "processing",
+    "processor",
     "scheduler"
   ],
   "engines": {
