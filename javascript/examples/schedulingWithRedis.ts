@@ -11,7 +11,7 @@
  * Requires NATS and Redis to be running.
  */
 import { StringCodec } from 'nats'
-import jobScheduler from '../src/jobScheduler'
+import { jobScheduler } from '../src/jobScheduler'
 const sc = StringCodec()
 
 const run = async () => {

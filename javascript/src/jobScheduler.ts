@@ -7,7 +7,7 @@ import { Recurring, RedisOpts, NatsOpts, Delayed } from './types'
 
 const debug = _debug('nats-jobs')
 
-const jobScheduler = async (opts?: RedisOpts & NatsOpts) => {
+export const jobScheduler = async (opts?: RedisOpts & NatsOpts) => {
   const { natsOpts, redisOpts } = opts || {}
   const connection = await connect(natsOpts)
   const js = connection.jetstream()
@@ -89,5 +89,3 @@ const jobScheduler = async (opts?: RedisOpts & NatsOpts) => {
 
   return { scheduleRecurring, scheduleDelayed, publishDelayed, js }
 }
-
-export default jobScheduler

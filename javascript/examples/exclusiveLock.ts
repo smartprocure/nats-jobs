@@ -19,7 +19,7 @@ import Redis from 'ioredis'
 import Redlock from 'redlock'
 import { setTimeout } from 'node:timers/promises'
 import ms from 'ms'
-import jobProcessor from '../src/jobProcessor'
+import { jobProcessor } from '../src/jobProcessor'
 
 const sc = StringCodec()
 const redis = new Redis()

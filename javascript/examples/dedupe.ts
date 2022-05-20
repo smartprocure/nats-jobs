@@ -12,7 +12,7 @@
 import { connect, JSONCodec, JsMsg } from 'nats'
 import { setTimeout } from 'node:timers/promises'
 import ms from 'ms'
-import jobProcessor from '../src/jobProcessor'
+import { jobProcessor } from '../src/jobProcessor'
 import { JobDef } from '../src/types'
 import { nanos } from '../src/util'
 
