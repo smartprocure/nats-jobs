@@ -1,7 +1,11 @@
+# 0.0.3
+
+* Expose JetStream client on both processor and scheduler.
+* processor `perform` now takes as second argument type `PerformOpts` which exposes the JetStream client in addition to `signal` and `def`
+
 # 0.0.2
 
 * Fixed importing when using type `module`.
-
 
 # 0.0.1
 
