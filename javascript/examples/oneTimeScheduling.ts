@@ -5,8 +5,8 @@
  */
 import { StringCodec } from 'nats'
 import ms from 'ms'
-import jobProcessor from '../src/jobProcessor'
-import jobScheduler from '../src/jobScheduler'
+import { jobProcessor } from '../src/jobProcessor'
+import { jobScheduler } from '../src/jobScheduler'
 
 const def = {
   stream: 'ORDERS',

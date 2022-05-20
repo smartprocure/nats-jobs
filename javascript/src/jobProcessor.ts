@@ -64,7 +64,7 @@ const createConsumer = (conn: NatsConnection, def: JobDef) => {
   })
 }
 
-const jobProcessor = async (opts?: NatsOpts) => {
+export const jobProcessor = async (opts?: NatsOpts) => {
   const { natsOpts } = opts || {}
   const conn = await connect(natsOpts)
   let timer: NodeJS.Timer
@@ -137,5 +137,3 @@ const jobProcessor = async (opts?: NatsOpts) => {
   }
   return { start, stop }
 }
-
-export default jobProcessor

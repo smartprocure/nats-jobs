@@ -6,7 +6,7 @@
  */
 import ms from 'ms'
 import { JsMsg } from 'nats'
-import jobProcessor from '../src/jobProcessor'
+import { jobProcessor } from '../src/jobProcessor'
 import { expBackoff } from '../src/util'
 
 const def = {

@@ -12,7 +12,7 @@
  */
 import { JsMsg } from 'nats'
 import { setTimeout } from 'node:timers/promises'
-import jobProcessor from '../src/jobProcessor'
+import { jobProcessor } from '../src/jobProcessor'
 import { expBackoff } from '../src/util'
 
 const def = {
