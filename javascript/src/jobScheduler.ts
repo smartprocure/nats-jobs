@@ -1,5 +1,5 @@
 import { connect } from 'nats'
-import nodeSchedule from 'node-schedule'
+import nodeSchedule, { RecurrenceRule } from 'node-schedule'
 import Redis from 'ioredis'
 import ms from 'ms'
 import _debug from 'debug'
@@ -59,25 +59,33 @@ export const jobScheduler = async (opts?: RedisOpts & NatsOpts) => {
   }
 
   /**
-   * Publish delayed one-time jobs for subject. Check for jobs every
-   * interval milliseconds. Default interval is every 5 seconds.
+   * Publish delayed one-time jobs for subject. Check for jobs
+   * according to the recurrence rule. Default interval is every 10 seconds.
    *
    * Guarantees at least one delivery.
    */
-  const publishDelayed = (subject: string, interval: number = ms('5s')) => {
+  const publishDelayed = (subject: string, rule: RecurrenceRule | string = '*/10 * * * * *') => {
     const key = `delayed:${subject}`
-    setInterval(async () => {
-      const upper = new Date().getTime()
-      // Get delayed jobs where the delayed timestamp is <= now
-      const items = await redis.zrangebyscoreBuffer(key, '-inf', upper)
-      if (items.length) {
-        // Publish messages
-        await Promise.all(items.map((data) => js.publish(subject, data)))
-        // Remove delayed jobs
-        await redis.zremrangebyscore(key, '-inf', upper)
+    return nodeSchedule.scheduleJob(rule, async (date) => {
+      const scheduledTime = date.getTime()
+      const lockKey = `${key}:${scheduledTime}`
+      const val = process.pid
+      // Attempt to get an exclusive lock. Lock expires in 1 minute.
+      const lockObtained = await redis.set(lockKey, val, 'PX', ms('1m'), 'NX')
+      if (lockObtained) {
+        debug('PUBLISH DELAYED', date)
+        const upper = new Date().getTime()
+        // Get delayed jobs where the delayed timestamp is <= now
+        const items = await redis.zrangebyscoreBuffer(key, '-inf', upper)
+        if (items.length) {
+          // Publish messages
+          await Promise.all(items.map((data) => js.publish(subject, data)))
+          // Remove delayed jobs
+          await redis.zremrangebyscore(key, '-inf', upper)
+        }
       }
-    }, interval)
+    })
   }
 
-  return { scheduleRecurring, scheduleDelayed, publishDelayed }
+  return { scheduleRecurring, scheduleDelayed, publishDelayed, js }
 }

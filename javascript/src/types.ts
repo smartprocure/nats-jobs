@@ -1,10 +1,16 @@
-import { ConnectionOptions, ConsumerConfig, JsMsg, StreamConfig } from 'nats'
+import { ConnectionOptions, ConsumerConfig, JsMsg, StreamConfig, JetStreamClient } from 'nats'
 import { RedisOptions } from 'ioredis'
 import {
   RecurrenceRule,
   RecurrenceSpecDateRange,
   RecurrenceSpecObjLit,
 } from 'node-schedule'
+
+export interface PerformOpts {
+  signal: AbortSignal,
+  def: JobDef,
+  js: JetStreamClient
+}
 
 export interface JobDef {
   stream: string
@@ -15,7 +21,7 @@ export interface JobDef {
   batch?: number
   backoff?: number | number[]
   numAttempts?: number
-  perform(msg: JsMsg, signal: AbortSignal, def: JobDef): Promise<void>
+  perform(msg: JsMsg, opts: PerformOpts): Promise<void>
 }
 
 export interface Recurring {
