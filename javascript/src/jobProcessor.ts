@@ -16,6 +16,11 @@ import { Deferred, NatsOpts, JobDef } from './types'
 
 const debug = _debug('nats-jobs')
 
+/**
+ * Get the next backoff based on the redelivery count. If given
+ * an array and no item exists for the attempt number use the last
+ * backoff in the array.
+ */
 const getNextBackoff = (backoff: number | number[], msg: JsMsg) => {
   if (Array.isArray(backoff)) {
     return backoff[msg.info.redeliveryCount - 1] || backoff.at(-1)
