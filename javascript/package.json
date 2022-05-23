@@ -1,6 +1,6 @@
 {
   "name": "nats-jobs",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Background job processor using NATS and Redis",
   "author": "GovSpend",
   "main": "dist/index.js",
