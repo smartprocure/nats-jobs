@@ -1,3 +1,7 @@
+# 0.0.4
+
+* Export types from index.ts.
+
 # 0.0.3
 
 * Expose JetStream client on both processor and scheduler.
