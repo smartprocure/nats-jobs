@@ -1,3 +1,7 @@
+# 0.0.5
+
+* Gracefully handle shutdown when using `jobScheduler.scheduleRecurring`.
+
 # 0.0.4
 
 * Export types from index.ts.

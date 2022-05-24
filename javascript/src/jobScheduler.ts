@@ -1,9 +1,17 @@
 import { connect } from 'nats'
-import nodeSchedule, { RecurrenceRule } from 'node-schedule'
+import nodeSchedule from 'node-schedule'
 import Redis from 'ioredis'
 import ms from 'ms'
 import _debug from 'debug'
-import { Recurring, RedisOpts, NatsOpts, Delayed } from './types'
+import {
+  Rule,
+  Deferred,
+  Recurring,
+  RedisOpts,
+  NatsOpts,
+  Delayed,
+} from './types'
+import { defer } from './util'
 
 const debug = _debug('nats-jobs')
 
@@ -25,8 +33,9 @@ export const jobScheduler = async (opts?: RedisOpts & NatsOpts) => {
    */
   const scheduleRecurring = ({ id, rule, subject, data }: Recurring) => {
     const isFunction = typeof data === 'function'
+    let deferred: Deferred<void>
     // Schedule job
-    return nodeSchedule.scheduleJob(rule, async (date) => {
+    const schedule = nodeSchedule.scheduleJob(rule, async (date) => {
       const keyPrefix = 'schedulingLock'
       const scheduledTime = date.getTime()
       const key = `${keyPrefix}:${id}:${scheduledTime}`
@@ -34,10 +43,18 @@ export const jobScheduler = async (opts?: RedisOpts & NatsOpts) => {
       // Attempt to get an exclusive lock. Lock expires in 1 minute.
       const lockObtained = await redis.set(key, val, 'PX', ms('1m'), 'NX')
       if (lockObtained) {
-        debug('SCHEDULED', date)
-        js.publish(subject, isFunction ? data(date) : data)
+        debug('LOCK OBTAINED: %s', date)
+        deferred = defer()
+        await js.publish(subject, isFunction ? data(date) : data)
+        debug('SCHEDULED: %s', date)
+        deferred.done()
       }
     })
+    const stop = () => {
+      schedule.cancel()
+      return deferred?.promise
+    }
+    return { schedule, stop }
   }
 
   /**
@@ -64,7 +81,7 @@ export const jobScheduler = async (opts?: RedisOpts & NatsOpts) => {
    *
    * Guarantees at least one delivery.
    */
-  const publishDelayed = (subject: string, rule: RecurrenceRule | string = '*/10 * * * * *') => {
+  const publishDelayed = (subject: string, rule: Rule = '*/10 * * * * *') => {
     const key = `delayed:${subject}`
     return nodeSchedule.scheduleJob(rule, async (date) => {
       const scheduledTime = date.getTime()
@@ -73,11 +90,12 @@ export const jobScheduler = async (opts?: RedisOpts & NatsOpts) => {
       // Attempt to get an exclusive lock. Lock expires in 1 minute.
       const lockObtained = await redis.set(lockKey, val, 'PX', ms('1m'), 'NX')
       if (lockObtained) {
-        debug('PUBLISH DELAYED', date)
+        debug('PUBLISH DELAYED: %s', date)
         const upper = new Date().getTime()
         // Get delayed jobs where the delayed timestamp is <= now
         const items = await redis.zrangebyscoreBuffer(key, '-inf', upper)
         if (items.length) {
+          debug('DELAYED JOBS FOUND: %d', items.length)
           // Publish messages
           await Promise.all(items.map((data) => js.publish(subject, data)))
           // Remove delayed jobs

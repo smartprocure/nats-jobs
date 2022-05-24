@@ -39,7 +39,7 @@ const def = {
 }
 const run = async () => {
   const processor = await jobProcessor()
-  // Gracefully handle signals
+  // Gracefully handle shutdown
   const shutDown = async () => {
     await processor.stop()
     process.exit(0)
@@ -68,12 +68,19 @@ const sc = StringCodec()
 
 const run = async () => {
   const scheduler = await jobScheduler()
-  scheduler.scheduleRecurring({
+  const { stop } = scheduler.scheduleRecurring({
     id: 'ordersEvery5s',
     rule: '*/5 * * * * *',
     subject: 'ORDERS',
     data: (date: Date) => sc.encode(`${date} : ${process.pid}`),
   })
+  // Gracefully handle shutdown
+  const shutDown = async () => {
+    await stop()
+    process.exit(0)
+  }
+  process.on('SIGTERM', shutDown)
+  process.on('SIGINT', shutDown)
 }
 
 run()

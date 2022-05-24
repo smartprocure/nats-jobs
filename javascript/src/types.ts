@@ -1,4 +1,10 @@
-import { ConnectionOptions, ConsumerConfig, JsMsg, StreamConfig, JetStreamClient } from 'nats'
+import {
+  ConnectionOptions,
+  ConsumerConfig,
+  JsMsg,
+  StreamConfig,
+  JetStreamClient,
+} from 'nats'
 import { RedisOptions } from 'ioredis'
 import {
   RecurrenceRule,
@@ -7,8 +13,8 @@ import {
 } from 'node-schedule'
 
 export interface PerformOpts {
-  signal: AbortSignal,
-  def: JobDef,
+  signal: AbortSignal
+  def: JobDef
   js: JetStreamClient
 }
 
@@ -24,15 +30,17 @@ export interface JobDef {
   perform(msg: JsMsg, opts: PerformOpts): Promise<void>
 }
 
+export type Rule =
+  | RecurrenceRule
+  | RecurrenceSpecDateRange
+  | RecurrenceSpecObjLit
+  | Date
+  | string
+  | number
+
 export interface Recurring {
   id: string
-  rule:
-    | RecurrenceRule
-    | RecurrenceSpecDateRange
-    | RecurrenceSpecObjLit
-    | Date
-    | string
-    | number
+  rule: Rule
   subject: string
   data: Uint8Array | ((date: Date) => Uint8Array)
 }
