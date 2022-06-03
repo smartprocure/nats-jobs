@@ -1,6 +1,6 @@
 # 0.0.6
 
-* Add flag `jobDef.autoExtendAck` (set to true by default) to auto-extend message acknowledgement timeout
+* Add flag `jobDef.autoExtendAckTimeout` (set to true by default) to auto-extend message acknowledgement timeout
   to prevent message from being redelivered while `jobDef.perform` is processing the message.
 
 # 0.0.5

@@ -70,13 +70,13 @@ const createConsumer = (conn: NatsConnection, def: JobDef) => {
   })
 }
 
-const extendAckThresholdFactor = 0.75
-const getExtendAckTimer = (
+const extendAckTimeoutThresholdFactor = 0.75
+const getExtendAckTimeoutTimer = (
   consumerInfo: ConsumerInfo,
   msg: JsMsg
 ): NodeJS.Timer => {
   let extendInterval =
-    nanosToMs(consumerInfo.config.ack_wait) * extendAckThresholdFactor
+    nanosToMs(consumerInfo.config.ack_wait) * extendAckTimeoutThresholdFactor
   // set up a timer to prevent a message from being redelivered
   // while perform is processing it
   return setInterval(() => {
@@ -107,7 +107,7 @@ export const jobProcessor = async (opts?: NatsOpts) => {
     const pullInterval = def.pullInterval ?? ms('1s')
     const backoff = def.backoff ?? ms('1s')
     const batch = def.batch ?? 10
-    const autoExtendAck = def.autoExtendAck ?? true
+    const autoExtendAckTimeout = def.autoExtendAckTimeout ?? true
     // Create stream
     // TODO: Maybe handle errors better
     await createStream(conn, def).catch()
@@ -126,8 +126,8 @@ export const jobProcessor = async (opts?: NatsOpts) => {
     for await (const msg of ps) {
       debug('RECEIVED', msg.info)
       deferred = defer()
-      if (autoExtendAck) {
-        extendAckTimer = getExtendAckTimer(consumerInfo, msg)
+      if (autoExtendAckTimeout) {
+        extendAckTimer = getExtendAckTimeoutTimer(consumerInfo, msg)
       }
 
       try {
