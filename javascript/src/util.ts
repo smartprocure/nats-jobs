@@ -1,7 +1,10 @@
 import ms from 'ms'
 import { Deferred } from './types'
+import { Nanos } from 'nats'
 
 export const nanos = (x: string) => ms(x) * 1e6
+
+export const nanosToMs = (x: Nanos | number | undefined) => (x ? x / 1e6 : 0)
 
 export const expBackoff = (
   startMs: number,

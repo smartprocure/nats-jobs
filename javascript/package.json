@@ -1,6 +1,6 @@
 {
   "name": "nats-jobs",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Background job processor using NATS and Redis",
   "author": "GovSpend",
   "main": "dist/index.js",
@@ -14,6 +14,7 @@
     "prepare": "npm run build",
     "build": "tsc --declaration",
     "test": "npm run lint",
+    "prettier": "prettier --ignore-path .gitignore --write './**/*.ts'",
     "lint": "eslint src/**"
   },
   "keywords": [

@@ -2,6 +2,7 @@ import ms from 'ms'
 import {
   AckPolicy,
   connect,
+  ConsumerInfo,
   DeliverPolicy,
   DiscardPolicy,
   JsMsg,
@@ -10,7 +11,7 @@ import {
   RetentionPolicy,
   StorageType,
 } from 'nats'
-import { nanos, defer } from './util'
+import { nanos, defer, nanosToMs } from './util'
 import _debug from 'debug'
 import { Deferred, NatsOpts, JobDef } from './types'
 
@@ -41,7 +42,7 @@ const createStream = async (conn: NatsConnection, def: JobDef) => {
     discard: DiscardPolicy.Old,
     deny_delete: false,
     deny_purge: false,
-    ...def.streamConfig
+    ...def.streamConfig,
   }
   debug('STREAM CONFIG %O', config)
   // Add stream
@@ -57,7 +58,7 @@ const createConsumer = (conn: NatsConnection, def: JobDef) => {
     ack_wait: nanos('10s'),
     deliver_policy: DeliverPolicy.All,
     replay_policy: ReplayPolicy.Instant,
-    ...def.consumerConfig
+    ...def.consumerConfig,
   }
   debug('CONSUMER CONFIG %O', config)
   const js = conn.jetstream()
@@ -67,6 +68,25 @@ const createConsumer = (conn: NatsConnection, def: JobDef) => {
     mack: true,
     config,
   })
+}
+
+const extendAckTimeoutThresholdFactor = 0.75
+const getExtendAckTimeoutTimer = (
+  consumerInfo: ConsumerInfo,
+  msg: JsMsg
+): NodeJS.Timer => {
+  let extendInterval =
+    nanosToMs(consumerInfo.config.ack_wait) * extendAckTimeoutThresholdFactor
+  // set up a timer to prevent a message from being redelivered
+  // while perform is processing it
+  return setInterval(() => {
+    debug('MSG EXTEND ACK %O', {
+      extendInterval,
+      msgInfo: msg.info,
+      consumerInfo,
+    })
+    msg.working()
+  }, extendInterval)
 }
 
 export const jobProcessor = async (opts?: NatsOpts) => {
@@ -82,15 +102,18 @@ export const jobProcessor = async (opts?: NatsOpts) => {
    * To gracefully shutdown see stop method.
    */
   const start = async (def: JobDef) => {
+    let extendAckTimer: NodeJS.Timer | undefined
     debug('JOB DEF %O', def)
     const pullInterval = def.pullInterval ?? ms('1s')
     const backoff = def.backoff ?? ms('1s')
     const batch = def.batch ?? 10
+    const autoExtendAckTimeout = def.autoExtendAckTimeout ?? true
     // Create stream
     // TODO: Maybe handle errors better
     await createStream(conn, def).catch()
     // Create pull consumer
     const ps = await createConsumer(conn, def)
+    const consumerInfo = await ps.consumerInfo()
     // Pull messages from the consumer
     const run = () => {
       ps.pull({ batch, expires: pullInterval })
@@ -103,6 +126,10 @@ export const jobProcessor = async (opts?: NatsOpts) => {
     for await (const msg of ps) {
       debug('RECEIVED', msg.info)
       deferred = defer()
+      if (autoExtendAckTimeout) {
+        extendAckTimer = getExtendAckTimeoutTimer(consumerInfo, msg)
+      }
+
       try {
         await def.perform(msg, { signal: abortController.signal, def, js })
         debug('COMPLETED')
@@ -115,6 +142,9 @@ export const jobProcessor = async (opts?: NatsOpts) => {
         // Negative ack message with backoff
         msg.nak(backoffMs)
       } finally {
+        if (extendAckTimer) {
+          clearInterval(extendAckTimer)
+        }
         deferred.done()
       }
       // Don't process any more messages if stopping
