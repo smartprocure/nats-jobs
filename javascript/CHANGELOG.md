@@ -1,6 +1,8 @@
 # 0.0.6
 
 * Moved `jobScheduler` to [ha-job-scheduler](https://www.npmjs.com/package/ha-job-scheduler).
+* Add flag `jobDef.autoExtendAckTimeout` (set to true by default) to auto-extend message acknowledgement timeout
+  to prevent message from being redelivered while `jobDef.perform` is processing the message.
 
 # 0.0.5
 

@@ -20,6 +20,7 @@ export interface JobDef {
   batch?: number
   backoff?: number | number[]
   numAttempts?: number
+  autoExtendAckTimeout?: boolean
   perform(msg: JsMsg, opts: PerformOpts): Promise<void>
 }
 
