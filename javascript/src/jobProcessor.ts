@@ -1,5 +1,6 @@
 import ms from 'ms'
 import {
+  ConnectionOptions,
   AckPolicy,
   connect,
   DeliverPolicy,
@@ -12,7 +13,7 @@ import {
 } from 'nats'
 import { nanos, defer } from './util'
 import _debug from 'debug'
-import { Deferred, NatsOpts, JobDef } from './types'
+import { Deferred, JobDef } from './types'
 
 const debug = _debug('nats-jobs')
 
@@ -43,7 +44,7 @@ const createStream = async (conn: NatsConnection, def: JobDef) => {
     deny_purge: false,
     ...def.streamConfig
   }
-  debug('STREAM CONFIG %O', config)
+  debug('stream config %O', config)
   // Add stream
   return jsm.streams.add(config)
 }
@@ -59,7 +60,7 @@ const createConsumer = (conn: NatsConnection, def: JobDef) => {
     replay_policy: ReplayPolicy.Instant,
     ...def.consumerConfig
   }
-  debug('CONSUMER CONFIG %O', config)
+  debug('consumer config %O', config)
   const js = conn.jetstream()
   // Create a pull consumer
   return js.pullSubscribe(def.filterSubject || '', {
@@ -69,9 +70,8 @@ const createConsumer = (conn: NatsConnection, def: JobDef) => {
   })
 }
 
-export const jobProcessor = async (opts?: NatsOpts) => {
-  const { natsOpts } = opts || {}
-  const conn = await connect(natsOpts)
+export const jobProcessor = async (opts?: ConnectionOptions) => {
+  const conn = await connect(opts)
   const js = conn.jetstream()
   let timer: NodeJS.Timer
   let deferred: Deferred<void>
@@ -82,7 +82,7 @@ export const jobProcessor = async (opts?: NatsOpts) => {
    * To gracefully shutdown see stop method.
    */
   const start = async (def: JobDef) => {
-    debug('JOB DEF %O', def)
+    debug('job def %O', def)
     const pullInterval = def.pullInterval ?? ms('1s')
     const backoff = def.backoff ?? ms('1s')
     const batch = def.batch ?? 10
@@ -101,17 +101,17 @@ export const jobProcessor = async (opts?: NatsOpts) => {
     timer = setInterval(run, pullInterval)
     // Consume messages
     for await (const msg of ps) {
-      debug('RECEIVED', msg.info)
+      debug('received', msg.info)
       deferred = defer()
       try {
         await def.perform(msg, { signal: abortController.signal, def, js })
-        debug('COMPLETED')
+        debug('completed')
         // Ack message
         await msg.ackAck()
       } catch (e) {
-        debug('FAILED', e)
+        debug('failed', e)
         const backoffMs = getNextBackoff(backoff, msg)
-        debug('NEXT BACKOFF MS', backoffMs)
+        debug('next backoff ms', backoffMs)
         // Negative ack message with backoff
         msg.nak(backoffMs)
       } finally {

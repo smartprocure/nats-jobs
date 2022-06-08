@@ -1,7 +1,7 @@
 {
   "name": "nats-jobs",
-  "version": "0.0.5",
-  "description": "Background job processor using NATS and Redis",
+  "version": "0.0.6",
+  "description": "Background job processor using NATS",
   "author": "GovSpend",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -12,7 +12,8 @@
   },
   "scripts": {
     "prepare": "npm run build",
-    "build": "tsc --declaration",
+    "build": "npm run clean && tsc --declaration",
+    "clean": "rm -rf dist",
     "test": "npm run lint",
     "lint": "eslint src/**"
   },
@@ -20,13 +21,11 @@
     "nats",
     "messaging",
     "queue",
-    "redis",
     "job",
     "worker",
     "background",
     "processing",
-    "processor",
-    "scheduler"
+    "processor"
   ],
   "engines": {
     "node": ">=16.0.0"
@@ -34,11 +33,9 @@
   "license": "ISC",
   "dependencies": {
     "debug": "^4.3.4",
-    "ms": "^2.1.3",
-    "node-schedule": "^2.1.0"
+    "ms": "^2.1.3"
   },
   "peerDependencies": {
-    "ioredis": ">= 5.0.4",
     "nats": ">= 2.6.1"
   },
   "prettier": {

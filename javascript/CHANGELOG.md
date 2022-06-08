@@ -1,3 +1,7 @@
+# 0.0.6
+
+* Moved `jobScheduler` to [ha-job-scheduler](https://www.npmjs.com/package/ha-job-scheduler).
+
 # 0.0.5
 
 * Gracefully handle shutdown when using `jobScheduler.scheduleRecurring`.

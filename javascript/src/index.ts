@@ -1,4 +1,3 @@
-export { jobProcessor } from './jobProcessor'
-export { jobScheduler } from './jobScheduler'
+export * from './jobProcessor'
 export * from './util'
 export * from './types'
