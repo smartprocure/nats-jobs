@@ -1,16 +1,20 @@
 # NATS Jobs
 
 Background job processing using [NATS](https://nats.io/) JetStream for distributing
-work. Scheduling is handled by [node-schedule](https://www.npmjs.com/package/node-schedule)
-and [Redis](https://redis.com/).
-
-Written in TypeScript.
+work.
 
 See examples directory for more examples.
+
+## Companion libraries
+
+* [ha-job-scheduler](https://www.npmjs.com/package/ha-job-scheduler)
+* [topology-runner](https://www.npmjs.com/package/topology-runner)
+* [nats-topology-runner](https://www.npmjs.com/package/nats-topology-runner)
 
 ## Usage
 
 This library uses [debug](https://www.npmjs.com/package/debug). To enable:
+
 ```
 DEBUG=nats-jobs node myfile.js
 ```
@@ -59,29 +63,10 @@ Publish via NATS
 nats pub ORDERS someText
 ```
 
-### Scheduling
+### Testing
 
-```typescript
-import { StringCodec } from 'nats'
-import { jobScheduler } from 'nats-jobs'
-const sc = StringCodec()
+Run the following in the `/docker` directory to start up NATS.
 
-const run = async () => {
-  const scheduler = await jobScheduler()
-  const { stop } = scheduler.scheduleRecurring({
-    id: 'ordersEvery5s',
-    rule: '*/5 * * * * *',
-    subject: 'ORDERS',
-    data: (date: Date) => sc.encode(`${date} : ${process.pid}`),
-  })
-  // Gracefully handle shutdown
-  const shutDown = async () => {
-    await stop()
-    process.exit(0)
-  }
-  process.on('SIGTERM', shutDown)
-  process.on('SIGINT', shutDown)
-}
-
-run()
+```
+docker compose up
 ```

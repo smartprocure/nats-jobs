@@ -1,8 +1,8 @@
 import ms from 'ms'
 import {
+  ConnectionOptions,
   AckPolicy,
   connect,
-  ConsumerInfo,
   DeliverPolicy,
   DiscardPolicy,
   JsMsg,
@@ -10,57 +10,67 @@ import {
   ReplayPolicy,
   RetentionPolicy,
   StorageType,
+  Nanos,
 } from 'nats'
-import { nanos, defer, nanosToMs } from './util'
+import { nanos, defer, getNextBackoff, nanosToMs } from './util'
 import _debug from 'debug'
-import { Deferred, NatsOpts, JobDef } from './types'
+import { Deferred, JobDef } from './types'
+import _ from 'lodash/fp'
 
 const debug = _debug('nats-jobs')
 
-/**
- * Get the next backoff based on the redelivery count. If given
- * an array and no item exists for the attempt number use the last
- * backoff in the array.
- */
-const getNextBackoff = (backoff: number | number[], msg: JsMsg) => {
-  if (Array.isArray(backoff)) {
-    return backoff[msg.info.redeliveryCount - 1] || backoff.at(-1)
-  }
-  return backoff
-}
+const streamDefaults = (def: JobDef) =>
+  _.defaults(
+    {
+      name: def.stream,
+      retention: RetentionPolicy.Workqueue,
+      storage: StorageType.File,
+      max_age: nanos('1w'),
+      num_replicas: 1,
+      subjects: [def.stream],
+      discard: DiscardPolicy.Old,
+      deny_delete: false,
+      deny_purge: false,
+    },
+    def.streamConfig
+  )
 
+/**
+ * Create the stream. By default we create a work queue with
+ * file storage. The default subject is the name of the stream.
+ */
 const createStream = async (conn: NatsConnection, def: JobDef) => {
   const jsm = await conn.jetstreamManager()
   // Stream config
-  const config = {
-    name: def.stream,
-    retention: RetentionPolicy.Workqueue,
-    storage: StorageType.File,
-    max_age: nanos('1w'),
-    num_replicas: 1,
-    subjects: [def.stream],
-    discard: DiscardPolicy.Old,
-    deny_delete: false,
-    deny_purge: false,
-    ...def.streamConfig,
-  }
-  debug('STREAM CONFIG %O', config)
+  const config = streamDefaults(def)
+  debug('stream config %O', config)
   // Add stream
   return jsm.streams.add(config)
 }
 
+const defaultAckWait = nanos('10s')
+
+const consumerDefaults = (def: JobDef) =>
+  _.defaults(
+    {
+      durable_name: `${def.stream}Consumer`,
+      max_deliver: def.numAttempts ?? 5,
+      ack_policy: AckPolicy.Explicit,
+      ack_wait: defaultAckWait,
+      deliver_policy: DeliverPolicy.All,
+      replay_policy: ReplayPolicy.Instant,
+    },
+    def.consumerConfig
+  )
+
+/**
+ * Create a pull consumer on the stream. Require manual acks.
+ * By default we don't filter subjects.
+ */
 const createConsumer = (conn: NatsConnection, def: JobDef) => {
   // Consumer config
-  const config = {
-    durable_name: `${def.stream}Consumer`,
-    max_deliver: def.numAttempts ?? 5,
-    ack_policy: AckPolicy.Explicit,
-    ack_wait: nanos('10s'),
-    deliver_policy: DeliverPolicy.All,
-    replay_policy: ReplayPolicy.Instant,
-    ...def.consumerConfig,
-  }
-  debug('CONSUMER CONFIG %O', config)
+  const config = consumerDefaults(def)
+  debug('consumer config %O', config)
   const js = conn.jetstream()
   // Create a pull consumer
   return js.pullSubscribe(def.filterSubject || '', {
@@ -71,49 +81,49 @@ const createConsumer = (conn: NatsConnection, def: JobDef) => {
 }
 
 const extendAckTimeoutThresholdFactor = 0.75
-const getExtendAckTimeoutTimer = (
-  consumerInfo: ConsumerInfo,
-  msg: JsMsg
-): NodeJS.Timer => {
-  let extendInterval =
-    nanosToMs(consumerInfo.config.ack_wait) * extendAckTimeoutThresholdFactor
-  // set up a timer to prevent a message from being redelivered
-  // while perform is processing it
+/**
+ * Automatically extend the ack timeout by periodically telling NATS
+ * we're working.
+ */
+const extendAckTimeout = (ackWait: Nanos, msg: JsMsg): NodeJS.Timer => {
+  const intervalMs = nanosToMs(ackWait) * extendAckTimeoutThresholdFactor
   return setInterval(() => {
-    debug('MSG EXTEND ACK %O', {
-      extendInterval,
-      msgInfo: msg.info,
-      consumerInfo,
-    })
+    debug('extend ack - wait: %d msg: %O', ackWait, msg.info)
     msg.working()
-  }, extendInterval)
+  }, intervalMs)
 }
 
-export const jobProcessor = async (opts?: NatsOpts) => {
-  const { natsOpts } = opts || {}
-  const conn = await connect(natsOpts)
+/**
+ * Start processing jobs based on def. To gracefully shutdown
+ * see stop method.
+ */
+export const jobProcessor = async (opts?: ConnectionOptions) => {
+  // Connect to NATS
+  const conn = await connect(opts)
   const js = conn.jetstream()
+  const abortController = new AbortController()
   let timer: NodeJS.Timer
   let deferred: Deferred<void>
-  const abortController = new AbortController()
 
   /**
-   * Start processing jobs based on def.
-   * To gracefully shutdown see stop method.
+   * Call perform for each message received on the stream.
    */
   const start = async (def: JobDef) => {
-    let extendAckTimer: NodeJS.Timer | undefined
-    debug('JOB DEF %O', def)
+    debug('job def %O', def)
     const pullInterval = def.pullInterval ?? ms('1s')
+    // Retry a failed message after a second by default
     const backoff = def.backoff ?? ms('1s')
+    // Pull down 10 messages by default
     const batch = def.batch ?? 10
+    // Automatically extend the ack timeout by default
     const autoExtendAckTimeout = def.autoExtendAckTimeout ?? true
     // Create stream
     // TODO: Maybe handle errors better
     await createStream(conn, def).catch()
     // Create pull consumer
     const ps = await createConsumer(conn, def)
-    const consumerInfo = await ps.consumerInfo()
+    // Get consumer info
+    const ackWait = consumerDefaults(def).ack_wait
     // Pull messages from the consumer
     const run = () => {
       ps.pull({ batch, expires: pullInterval })
@@ -124,24 +134,25 @@ export const jobProcessor = async (opts?: NatsOpts) => {
     timer = setInterval(run, pullInterval)
     // Consume messages
     for await (const msg of ps) {
-      debug('RECEIVED', msg.info)
+      debug('received %O', msg.info)
       deferred = defer()
-      if (autoExtendAckTimeout) {
-        extendAckTimer = getExtendAckTimeoutTimer(consumerInfo, msg)
-      }
-
+      // Auto-extend ack timeout
+      const extendAckTimer =
+        autoExtendAckTimeout && extendAckTimeout(ackWait, msg)
       try {
+        // Process the message
         await def.perform(msg, { signal: abortController.signal, def, js })
-        debug('COMPLETED')
+        debug('completed')
         // Ack message
         await msg.ackAck()
       } catch (e) {
-        debug('FAILED', e)
+        debug('failed %O', e)
         const backoffMs = getNextBackoff(backoff, msg)
-        debug('NEXT BACKOFF MS', backoffMs)
+        debug('next backoff ms %d', backoffMs)
         // Negative ack message with backoff
         msg.nak(backoffMs)
       } finally {
+        // Clear auto-extend timer
         if (extendAckTimer) {
           clearInterval(extendAckTimer)
         }
@@ -167,7 +178,9 @@ export const jobProcessor = async (opts?: NatsOpts) => {
    * ```
    */
   const stop = () => {
+    // Send abort signal to perform
     abortController.abort()
+    // Don't pull any more messages
     clearInterval(timer)
     return deferred?.promise
   }
