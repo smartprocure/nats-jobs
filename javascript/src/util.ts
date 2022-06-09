@@ -3,8 +3,13 @@ import { Deferred } from './types'
 import { JsMsg, Nanos } from 'nats'
 
 export const nanos = (x: string) => ms(x) * 1e6
-export const nanosToMs = (x: Nanos | number | undefined) => (x ? x / 1e6 : 0)
+export const nanosToMs = (x: Nanos | undefined) => (x ? x / 1e6 : 0)
 
+/**
+ * Given a starting backoff in ms, generate an array of doubling
+ * values with at most `numEntries` and repeating after
+ * `repeatAfter` entries.
+ */
 export const expBackoff = (
   startMs: number,
   { repeatAfter = 5, numEntries = 5 } = {}
@@ -13,7 +18,7 @@ export const expBackoff = (
   let val = startMs
   for (let i = 0; i < numEntries; i++) {
     vals.push(val)
-    val = i === repeatAfter ? val : val * 2
+    val = i + 1 >= repeatAfter ? val : val * 2
   }
   return vals
 }
@@ -21,8 +26,9 @@ export const expBackoff = (
 export function defer<A>(): Deferred<A> {
   // eslint-disable-next-line
   let done = (value: A) => {}
-  const promise = new Promise<A>((res) => {
-    done = res
+  const promise = new Promise<A>((resolve) => {
+    // Swap original done fn with promise resolve fn
+    done = resolve
   })
   return {
     done,
@@ -41,4 +47,3 @@ export const getNextBackoff = (backoff: number | number[], msg: JsMsg) => {
   }
   return backoff
 }
-
