@@ -168,7 +168,8 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
     }
   }
   /**
-   * To be used from caller to await all jobs to be completed
+   * To be used from caller to await all jobs to be completed without
+   * signaling an abort and stopping the processing of messages
    */
   const finish = () => Promise.all(_.map('promise', deferreds))
   /**
