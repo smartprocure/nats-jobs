@@ -102,14 +102,15 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
   const conn = await connect(opts)
   const js = conn.jetstream()
   const abortController = new AbortController()
-  let timer: NodeJS.Timer
-  let deferred: Deferred<void>
+  const timers: NodeJS.Timer[] = []
+  const deferreds: Deferred<void>[] = []
 
   /**
    * Call perform for each message received on the stream.
    */
   const start = async (def: JobDef) => {
     debug('job def %O', def)
+    let deferred: Deferred<void>
     const pullInterval = def.pullInterval ?? ms('1s')
     // Retry a failed message after a second by default
     const backoff = def.backoff ?? ms('1s')
@@ -131,11 +132,12 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
     // Do the initial pull
     run()
     // Pull regularly
-    timer = setInterval(run, pullInterval)
+    timers.push(setInterval(run, pullInterval))
     // Consume messages
     for await (const msg of ps) {
       debug('received %O', msg.info)
       deferred = defer()
+      deferreds.push(deferred)
       // Auto-extend ack timeout
       const extendAckTimer =
         autoExtendAckTimeout && extendAckTimeout(ackWait, msg)
@@ -157,6 +159,7 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
           clearInterval(extendAckTimer)
         }
         deferred.done()
+        deferreds.pop()
       }
       // Don't process any more messages if stopping
       if (abortController.signal.aborted) {
@@ -164,6 +167,10 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
       }
     }
   }
+  /**
+   * To be used from caller to await all jobs to be completed
+   */
+  const finish = () => Promise.all(_.map('promise', deferreds))
   /**
    * To be used in conjunction with SIGTERM and SIGINT.
    *
@@ -181,8 +188,11 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
     // Send abort signal to perform
     abortController.abort()
     // Don't pull any more messages
-    clearInterval(timer)
-    return deferred?.promise
+    for (const timer of timers) {
+      clearInterval(timer)
+    }
+    return finish()
   }
-  return { start, stop, js }
+
+  return { start, stop, finish, js }
 }

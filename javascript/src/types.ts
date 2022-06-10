@@ -1,9 +1,4 @@
-import {
-  ConsumerConfig,
-  JsMsg,
-  StreamConfig,
-  JetStreamClient,
-} from 'nats'
+import { ConsumerConfig, JsMsg, StreamConfig, JetStreamClient } from 'nats'
 
 export interface PerformOpts {
   signal: AbortSignal

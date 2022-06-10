@@ -5,7 +5,8 @@
  *
  * (1) Run script: npx ts-node examples/abortSignal.ts
  * (2) Publish a message: nats pub ORDERS someText
- * (3) Crl-C the script in the middle of the 1-5 log messages.
+ * (3) Optionally, also publish a message after a short period of time from step 2: nats pub ORDERS2 someOtherText
+ * (4) Crl-C the script in the middle of the 1-5 log messages.
  *
  * Requires NATS to be running.
  */
@@ -28,6 +29,12 @@ const def = {
     console.log(`Completed ${msg.info.streamSequence}`)
   },
 }
+
+const def2 = {
+  ...def,
+  stream: 'ORDERS2',
+}
+
 const run = async () => {
   const processor = await jobProcessor()
   // Gracefully handle signals
@@ -39,6 +46,7 @@ const run = async () => {
   process.on('SIGINT', shutDown)
   // Start processing messages
   processor.start(def)
+  processor.start(def2)
 }
 
 run()
