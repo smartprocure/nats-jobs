@@ -1,3 +1,9 @@
+# 0.1.1
+
+* Add `await processor.finish()` if the caller wants to await all jobs currently being processed
+  to complete
+* Handle aborting/awaiting multiple job definitions started by the same processor
+
 # 0.1.0
 
 * Moved `jobScheduler` to [ha-job-scheduler](https://www.npmjs.com/package/ha-job-scheduler).
