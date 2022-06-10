@@ -1,3 +1,7 @@
+# 0.2.0
+
+* Starting and stopping are scoped to a single job definition. API change.
+
 # 0.1.0
 
 * Moved `jobScheduler` to [ha-job-scheduler](https://www.npmjs.com/package/ha-job-scheduler).
