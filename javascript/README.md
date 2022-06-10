@@ -7,9 +7,9 @@ See examples directory for more examples.
 
 ## Companion libraries
 
-* [ha-job-scheduler](https://www.npmjs.com/package/ha-job-scheduler)
-* [topology-runner](https://www.npmjs.com/package/topology-runner)
-* [nats-topology-runner](https://www.npmjs.com/package/nats-topology-runner)
+- [ha-job-scheduler](https://www.npmjs.com/package/ha-job-scheduler)
+- [topology-runner](https://www.npmjs.com/package/topology-runner)
+- [nats-topology-runner](https://www.npmjs.com/package/nats-topology-runner)
 
 ## Usage
 
@@ -41,20 +41,34 @@ const def = {
     console.log(`Completed ${msg.info.streamSequence}`)
   },
 }
-const run = async () => {
-  const processor = await jobProcessor()
-  // Gracefully handle shutdown
-  const shutDown = async () => {
-    await processor.stop()
-    process.exit(0)
-  }
-  process.on('SIGTERM', shutDown)
-  process.on('SIGINT', shutDown)
-  // Start processing messages
-  processor.start(def)
+
+const processor = await jobProcessor()
+const myJob = processor.start(jobDef)
+// Gracefully handle shutdown
+const shutDown = async () => {
+  await myJob.stop()
+  process.exit(0)
+}
+process.on('SIGTERM', shutDown)
+process.on('SIGINT', shutDown)
+```
+
+To gracefully shutdown mutliple jobs you could do something like this:
+
+```typescript
+const processor = await jobProcessor()
+const jobs = [
+  processor.start(jobDef1),
+  processor.start(jobDef2),
+  processor.start(jobDef3),
+]
+const shutDown = async () => {
+  await Promise.all(jobs.map((x) => x.stop()))
+  process.exit(0)
 }
 
-run()
+process.on('SIGTERM', shutDown)
+process.on('SIGINT', shutDown)
 ```
 
 Publish via NATS
