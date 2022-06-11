@@ -29,4 +29,4 @@ export interface Deferred<A> {
   promise: Promise<A>
 }
 
-export type StopFn = () => void
+export type StopFn = () => Promise<void>
