@@ -53,7 +53,8 @@ process.on('SIGTERM', shutDown)
 process.on('SIGINT', shutDown)
 ```
 
-To gracefully shutdown mutliple jobs you could do something like this:
+To gracefully shutdown mutliple jobs and close the NATS connection call
+`stop` from the object returned by `jobProcessor`.
 
 ```typescript
 const processor = await jobProcessor()
@@ -63,6 +64,7 @@ const jobs = [
   processor.start(jobDef3),
 ]
 const shutDown = async () => {
+  // Shuts down jobs 1, 2, and 3 and closes the NATS connection
   await processor.stop()
   process.exit(0)
 }
