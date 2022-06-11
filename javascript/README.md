@@ -63,7 +63,7 @@ const jobs = [
   processor.start(jobDef3),
 ]
 const shutDown = async () => {
-  await Promise.all(jobs.map((x) => x.stop()))
+  await processor.stop()
   process.exit(0)
 }
 

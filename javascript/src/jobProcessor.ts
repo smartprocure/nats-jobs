@@ -14,7 +14,7 @@ import {
 } from 'nats'
 import { nanos, defer, getNextBackoff, nanosToMs } from './util'
 import _debug from 'debug'
-import { Deferred, JobDef } from './types'
+import { Deferred, JobDef, StopFn } from './types'
 import _ from 'lodash/fp'
 
 const debug = _debug('nats-jobs')
@@ -101,6 +101,7 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
   // Connect to NATS
   const conn = await connect(opts)
   const js = conn.jetstream()
+  const stopFns: StopFn[] = []
 
   /**
    * Call perform for each message received on the stream.
@@ -127,13 +128,13 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
       // Get consumer info
       const ackWait = consumerDefaults(def).ack_wait
       // Pull messages from the consumer
-      const run = () => {
+      const pull = () => {
         ps.pull({ batch, expires: pullInterval })
       }
       // Do the initial pull
-      run()
+      pull()
       // Pull regularly
-      timer = setInterval(run, pullInterval)
+      timer = setInterval(pull, pullInterval)
       // Consume messages
       for await (const msg of ps) {
         debug('received %O', msg.info)
@@ -187,12 +188,22 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
       abortController.abort()
       // Don't pull any more messages
       clearInterval(timer)
+      // Wait for current message to finish processing
       return deferred?.promise
     }
-
+    // Track all stop fns so we can shutdown with one call
+    stopFns.push(stop)
+    // Start processing messages
     run()
 
     return { stop }
   }
-  return { start, js }
+  /**
+   * Call stop on all jobs and close NATS connection
+   */
+  const stop = async () => {
+    await Promise.all(stopFns.map((stop) => stop()))
+    await conn.close()
+  }
+  return { start, stop }
 }
