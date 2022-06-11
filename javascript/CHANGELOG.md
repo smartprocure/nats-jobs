@@ -1,6 +1,9 @@
 # 0.2.0
 
-* Starting and stopping are scoped to a single job definition. API change.
+* API changes!
+* Starting and stopping should be scoped to a single job def.
+* Top-level `stop` fn that stops all started jobs and closes the NATS connection.
+* Remove the exported Jetstream reference since we close the NATS connection and wouldn't know if that would break something down stream otherwise.
 
 # 0.1.0
 
