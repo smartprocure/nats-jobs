@@ -11,7 +11,7 @@
     "directory": "javascript"
   },
   "scripts": {
-    "prepare": "npm run build",
+    "prepare": "npm run lint && npm run test && npm run build",
     "build": "npm run clean && tsc --declaration",
     "clean": "rm -rf dist",
     "test": "jest",

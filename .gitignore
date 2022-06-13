@@ -64,3 +64,4 @@ test-results.json
 dist/
 
 *.un~
+package-lock.json
