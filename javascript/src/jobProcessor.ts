@@ -14,7 +14,7 @@ import {
 } from 'nats'
 import { nanos, defer, getNextBackoff, nanosToMs } from './util'
 import _debug from 'debug'
-import { Deferred, JobDef } from './types'
+import { Deferred, JobDef, StopFn } from './types'
 import _ from 'lodash/fp'
 
 const debug = _debug('nats-jobs')
@@ -101,88 +101,109 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
   // Connect to NATS
   const conn = await connect(opts)
   const js = conn.jetstream()
-  const abortController = new AbortController()
-  let timer: NodeJS.Timer
-  let deferred: Deferred<void>
+  const stopFns: StopFn[] = []
 
   /**
    * Call perform for each message received on the stream.
    */
-  const start = async (def: JobDef) => {
-    debug('job def %O', def)
-    const pullInterval = def.pullInterval ?? ms('1s')
-    // Retry a failed message after a second by default
-    const backoff = def.backoff ?? ms('1s')
-    // Pull down 10 messages by default
-    const batch = def.batch ?? 10
-    // Automatically extend the ack timeout by default
-    const autoExtendAckTimeout = def.autoExtendAckTimeout ?? true
-    // Create stream
-    // TODO: Maybe handle errors better
-    await createStream(conn, def).catch()
-    // Create pull consumer
-    const ps = await createConsumer(conn, def)
-    // Get consumer info
-    const ackWait = consumerDefaults(def).ack_wait
-    // Pull messages from the consumer
-    const run = () => {
-      ps.pull({ batch, expires: pullInterval })
-    }
-    // Do the initial pull
-    run()
-    // Pull regularly
-    timer = setInterval(run, pullInterval)
-    // Consume messages
-    for await (const msg of ps) {
-      debug('received %O', msg.info)
-      deferred = defer()
-      // Auto-extend ack timeout
-      const extendAckTimer =
-        autoExtendAckTimeout && extendAckTimeout(ackWait, msg)
-      try {
-        // Process the message
-        await def.perform(msg, { signal: abortController.signal, def, js })
-        debug('completed')
-        // Ack message
-        await msg.ackAck()
-      } catch (e) {
-        debug('failed %O', e)
-        const backoffMs = getNextBackoff(backoff, msg)
-        debug('next backoff ms %d', backoffMs)
-        // Negative ack message with backoff
-        msg.nak(backoffMs)
-      } finally {
-        // Clear auto-extend timer
-        if (extendAckTimer) {
-          clearInterval(extendAckTimer)
+  const start = (def: JobDef) => {
+    const abortController = new AbortController()
+    let timer: NodeJS.Timer
+    let deferred: Deferred<void>
+
+    const run = async () => {
+      debug('job def %O', def)
+      const pullInterval = def.pullInterval ?? ms('1s')
+      // Retry a failed message after a second by default
+      const backoff = def.backoff ?? ms('1s')
+      // Pull down 10 messages by default
+      const batch = def.batch ?? 10
+      // Automatically extend the ack timeout by default
+      const autoExtendAckTimeout = def.autoExtendAckTimeout ?? true
+      // Create stream
+      // TODO: Maybe handle errors better
+      await createStream(conn, def).catch()
+      // Create pull consumer
+      const ps = await createConsumer(conn, def)
+      // Get consumer info
+      const ackWait = consumerDefaults(def).ack_wait
+      // Pull messages from the consumer
+      const pull = () => {
+        ps.pull({ batch, expires: pullInterval })
+      }
+      // Do the initial pull
+      pull()
+      // Pull regularly
+      timer = setInterval(pull, pullInterval)
+      // Consume messages
+      for await (const msg of ps) {
+        debug('received %O', msg.info)
+        deferred = defer()
+        // Auto-extend ack timeout
+        const extendAckTimer =
+          autoExtendAckTimeout && extendAckTimeout(ackWait, msg)
+        try {
+          // Process the message
+          await def.perform(msg, { signal: abortController.signal, def, js })
+          debug('completed')
+          // Ack message
+          await msg.ackAck()
+        } catch (e) {
+          debug('failed %O', e)
+          const backoffMs = getNextBackoff(backoff, msg)
+          debug('next backoff ms %d', backoffMs)
+          // Negative ack message with backoff
+          msg.nak(backoffMs)
+        } finally {
+          // Clear auto-extend timer
+          if (extendAckTimer) {
+            clearInterval(extendAckTimer)
+          }
+          deferred.done()
         }
-        deferred.done()
-      }
-      // Don't process any more messages if stopping
-      if (abortController.signal.aborted) {
-        return
+        // Don't process any more messages if stopping
+        if (abortController.signal.aborted) {
+          return
+        }
       }
     }
+
+    /**
+     * To be used in conjunction with SIGTERM and SIGINT.
+     *
+     * ```ts
+     * const processor = await jobProcessor()
+     * const stop = processor.start({})
+     * const shutDown = async () => {
+     *   await stop()
+     *   process.exit(0)
+     * }
+     *
+     * process.on('SIGTERM', shutDown)
+     * process.on('SIGINT', shutDown)
+     * ```
+     */
+    const stop = () => {
+      // Send abort signal to perform
+      abortController.abort()
+      // Don't pull any more messages
+      clearInterval(timer)
+      // Wait for current message to finish processing
+      return deferred?.promise
+    }
+    // Track all stop fns so we can shutdown with one call
+    stopFns.push(stop)
+    // Start processing messages
+    run()
+
+    return { stop }
   }
   /**
-   * To be used in conjunction with SIGTERM and SIGINT.
-   *
-   * ```ts
-   * const processor = await jobProcessor()
-   * const shutDown = async () => {
-   *   await processor.stop()
-   *   process.exit(0)
-   * }
-   * process.on('SIGTERM', shutDown)
-   * process.on('SIGINT', shutDown)
-   * ```
+   * Call stop on all jobs and close NATS connection
    */
-  const stop = () => {
-    // Send abort signal to perform
-    abortController.abort()
-    // Don't pull any more messages
-    clearInterval(timer)
-    return deferred?.promise
+  const stop = async () => {
+    await Promise.all(stopFns.map((stop) => stop()))
+    await conn.close()
   }
-  return { start, stop, js }
+  return { start, stop }
 }

@@ -28,15 +28,15 @@ const def = {
 }
 const run = async () => {
   const processor = await jobProcessor()
+  // Start processing messages
+  const ordersJob = processor.start(def)
   // Gracefully handle signals
   const shutDown = async () => {
-    await processor.stop()
+    await ordersJob.stop()
     process.exit(0)
   }
   process.on('SIGTERM', shutDown)
   process.on('SIGINT', shutDown)
-  // Start processing messages
-  processor.start(def)
 }
 
 run()
