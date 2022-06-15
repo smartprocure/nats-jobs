@@ -1,3 +1,7 @@
+# 0.3.0
+
+* Renamed `PerformOpts` to `Context`.
+
 # 0.2.0
 
 * API changes!

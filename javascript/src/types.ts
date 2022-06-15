@@ -5,7 +5,7 @@ import {
   JetStreamClient,
 } from 'nats'
 
-export interface PerformOpts {
+export interface Context {
   signal: AbortSignal
   def: JobDef
   js: JetStreamClient
@@ -21,7 +21,7 @@ export interface JobDef {
   backoff?: number | number[]
   numAttempts?: number
   autoExtendAckTimeout?: boolean
-  perform(msg: JsMsg, context: PerformOpts): Promise<void>
+  perform(msg: JsMsg, context: Context): Promise<void>
 }
 
 export interface Deferred<A> {
