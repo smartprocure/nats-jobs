@@ -21,7 +21,7 @@ export interface JobDef {
   backoff?: number | number[]
   numAttempts?: number
   autoExtendAckTimeout?: boolean
-  perform(msg: JsMsg, opts: PerformOpts): Promise<void>
+  perform(msg: JsMsg, context: PerformOpts): Promise<void>
 }
 
 export interface Deferred<A> {
