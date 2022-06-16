@@ -94,8 +94,8 @@ const extendAckTimeout = (ackWait: Nanos, msg: JsMsg): NodeJS.Timer => {
 }
 
 /**
- * Start processing jobs based on def. To gracefully shutdown
- * see stop method.
+ * Call `start` to begin processing jobs based on def. To
+ * gracefully shutdown call `stop` method.
  */
 export const jobProcessor = async (opts?: ConnectionOptions) => {
   // Connect to NATS
@@ -125,7 +125,7 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
       await createStream(conn, def).catch()
       // Create pull consumer
       const ps = await createConsumer(conn, def)
-      // Get consumer info
+      // Get ack wait time
       const ackWait = consumerDefaults(def).ack_wait
       // Pull messages from the consumer
       const pull = () => {
