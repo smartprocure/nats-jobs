@@ -1,5 +1,5 @@
 import ms from 'ms'
-import { Deferred } from './types'
+import { BackoffOptions, Deferred } from './types'
 import { JsMsg, Nanos } from 'nats'
 
 export const nanos = (x: string) => ms(x) * 1e6
@@ -9,11 +9,13 @@ export const nanosToMs = (x: Nanos | undefined) => (x ? x / 1e6 : 0)
  * Given a starting backoff in ms, generate an array of doubling
  * values with at most `numEntries` and repeating after
  * `repeatAfter` entries.
+ *
+ * Note that `repeatAfter` defaults to `numEntries` and `numEntries`
+ * defaults to 5.
  */
-export const expBackoff = (
-  startMs: number,
-  { repeatAfter = 5, numEntries = 5 } = {}
-) => {
+export const expBackoff = (startMs: number, options?: BackoffOptions) => {
+  const numEntries = options?.numEntries || 5
+  const repeatAfter = options?.repeatAfter || numEntries
   const vals = []
   let val = startMs
   for (let i = 0; i < numEntries; i++) {

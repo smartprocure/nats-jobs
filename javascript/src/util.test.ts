@@ -39,6 +39,10 @@ describe('expBackoff', () => {
     const result = expBackoff(1000)
     expect(result).toEqual([1000, 2000, 4000, 8000, 16000])
   })
+  test('should return desired number of entries without repeating', () => {
+    const result = expBackoff(1000, { numEntries: 7 })
+    expect(result).toEqual([1000, 2000, 4000, 8000, 16000, 32000, 64000])
+  })
   test('should limit entries according to numEntries', () => {
     const result = expBackoff(1000, { numEntries: 3 })
     expect(result).toEqual([1000, 2000, 4000])
@@ -46,5 +50,9 @@ describe('expBackoff', () => {
   test('should repeat after n entries according to repeatAfter', () => {
     const result = expBackoff(1000, { repeatAfter: 3 })
     expect(result).toEqual([1000, 2000, 4000, 4000, 4000])
+  })
+  test('should respect all options', () => {
+    const result = expBackoff(5000, { repeatAfter: 4, numEntries: 6 })
+    expect(result).toEqual([5000, 10000, 20000, 40000, 40000, 40000])
   })
 })

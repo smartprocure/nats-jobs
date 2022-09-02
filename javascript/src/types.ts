@@ -30,3 +30,8 @@ export interface Deferred<A> {
 }
 
 export type StopFn = () => Promise<void>
+
+export interface BackoffOptions {
+  numEntries?: number
+  repeatAfter?: number
+}

@@ -1,3 +1,7 @@
+# 0.4.0
+
+* `repeatAfter` defaults to `numEntries` for `expBackoff` util fn.
+
 # 0.3.0
 
 * Renamed `PerformOpts` to `Context`.
