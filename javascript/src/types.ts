@@ -35,3 +35,5 @@ export interface BackoffOptions {
   numEntries?: number
   repeatAfter?: number
 }
+
+export type Events = 'start' | 'complete' | 'error'

@@ -1,3 +1,7 @@
+# 0.5.0
+
+* Return an emitter from `jobProcessor` to enable logging of message events: `start`, `complete`, `error`.
+
 # 0.4.0
 
 * `repeatAfter` defaults to `numEntries` for `expBackoff` util fn.
