@@ -14,8 +14,9 @@ import {
 } from 'nats'
 import { nanos, defer, getNextBackoff, nanosToMs } from './util'
 import _debug from 'debug'
-import { Deferred, JobDef, StopFn } from './types'
+import { Deferred, JobDef, StopFn, Events } from './types'
 import _ from 'lodash/fp'
+import EventEmitter from 'eventemitter3'
 
 const debug = _debug('nats-jobs')
 
@@ -102,10 +103,8 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
   const conn = await connect(opts)
   const js = conn.jetstream()
   const stopFns: StopFn[] = []
+  const emitter = new EventEmitter<Events>()
 
-  /**
-   * Call perform for each message received on the stream.
-   */
   const start = (def: JobDef) => {
     const abortController = new AbortController()
     let timer: NodeJS.Timer
@@ -125,8 +124,9 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
       await createStream(conn, def).catch()
       // Create pull consumer
       const ps = await createConsumer(conn, def)
-      // Get ack wait time
-      const ackWait = consumerDefaults(def).ack_wait
+      // Consumer config
+      const consumerConfig = consumerDefaults(def)
+      const ackWait = consumerConfig.ack_wait
       // Pull messages from the consumer
       const pull = () => {
         ps.pull({ batch, expires: pullInterval })
@@ -137,20 +137,29 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
       timer = setInterval(pull, pullInterval)
       // Consume messages
       for await (const msg of ps) {
-        debug('received %O', msg.info)
+        const metadata = { msgInfo: msg.info, consumerConfig }
+        debug('received %O', metadata)
         deferred = defer()
         // Auto-extend ack timeout
         const extendAckTimer =
           autoExtendAckTimeout && extendAckTimeout(ackWait, msg)
         try {
+          emitter.emit('start', { ...metadata, type: 'start' })
           // Process the message
           await def.perform(msg, { signal: abortController.signal, def, js })
           debug('completed')
+          emitter.emit('complete', { ...metadata, type: 'complete' })
           // Ack message
           await msg.ackAck()
         } catch (e) {
-          debug('failed %O', e)
+          debug('error %O', e)
           const backoffMs = getNextBackoff(backoff, msg)
+          emitter.emit('error', {
+            ...metadata,
+            type: 'error',
+            backoffMs,
+            error: e,
+          })
           debug('next backoff ms %d', backoffMs)
           // Negative ack message with backoff
           msg.nak(backoffMs)
@@ -198,12 +207,20 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
 
     return { stop }
   }
-  /**
-   * Call stop on all jobs and close NATS connection
-   */
+
   const stop = async () => {
     await Promise.all(stopFns.map((stop) => stop()))
     await conn.close()
   }
-  return { start, stop }
+  return {
+    /**
+     * Call perform for each message received on the stream.
+     */
+    start,
+    /**
+     * Call stop on all jobs and close the NATS connection.
+     */
+    stop,
+    emitter,
+  }
 }

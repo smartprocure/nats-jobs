@@ -28,6 +28,9 @@ const def = {
 }
 const run = async () => {
   const processor = await jobProcessor()
+  processor.emitter.on('start', console.info)
+  processor.emitter.on('complete', console.info)
+  processor.emitter.on('error', console.error)
   // Start processing messages
   const ordersJob = processor.start(def)
   // Gracefully handle signals
