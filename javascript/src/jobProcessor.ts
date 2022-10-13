@@ -175,21 +175,6 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
       }
     }
 
-    /**
-     * To be used in conjunction with SIGTERM and SIGINT.
-     *
-     * ```ts
-     * const processor = await jobProcessor()
-     * const stop = processor.start({})
-     * const shutDown = async () => {
-     *   await stop()
-     *   process.exit(0)
-     * }
-     *
-     * process.on('SIGTERM', shutDown)
-     * process.on('SIGINT', shutDown)
-     * ```
-     */
     const stop = () => {
       // Send abort signal to perform
       abortController.abort()
@@ -203,7 +188,24 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
     // Start processing messages
     run()
 
-    return { stop }
+    return {
+      /**
+       * To be used in conjunction with SIGTERM and SIGINT.
+       *
+       * ```ts
+       * const processor = await jobProcessor()
+       * const stop = processor.start({})
+       * const shutDown = async () => {
+       *   await stop()
+       *   process.exit(0)
+       * }
+       *
+       * process.on('SIGTERM', shutDown)
+       * process.on('SIGINT', shutDown)
+       * ```
+       */
+      stop,
+    }
   }
 
   const stop = async () => {
