@@ -104,6 +104,9 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
   const js = conn.jetstream()
   const stopFns: StopFn[] = []
   const emitter = new EventEmitter<Events>()
+  const emit = (event: Events, data: object) => {
+    emitter.emit(event, { type: event, ...data })
+  }
 
   const start = (def: JobDef) => {
     const abortController = new AbortController()
@@ -144,22 +147,17 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
         const extendAckTimer =
           autoExtendAckTimeout && extendAckTimeout(ackWait, msg)
         try {
-          emitter.emit('start', { ...metadata, type: 'start' })
+          emit('start', metadata)
           // Process the message
           await def.perform(msg, { signal: abortController.signal, def, js })
           debug('completed')
-          emitter.emit('complete', { ...metadata, type: 'complete' })
+          emit('complete', metadata)
           // Ack message
           await msg.ackAck()
         } catch (e) {
           debug('error %O', e)
           const backoffMs = getNextBackoff(backoff, msg)
-          emitter.emit('error', {
-            ...metadata,
-            type: 'error',
-            backoffMs,
-            error: e,
-          })
+          emit('error', { ...metadata, backoffMs, error: e })
           debug('next backoff ms %d', backoffMs)
           // Negative ack message with backoff
           msg.nak(backoffMs)
