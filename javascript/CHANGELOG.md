@@ -1,3 +1,7 @@
+# 0.6.0
+
+* Pass `attemptsExhausted` to `error` emitter indicating when the `redeliveryCount` equals `max_deliver`.
+
 # 0.5.0
 
 * Return an emitter from `jobProcessor` to enable logging of message events: `start`, `complete`, `error`.

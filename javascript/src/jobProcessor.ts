@@ -124,7 +124,8 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
       const autoExtendAckTimeout = def.autoExtendAckTimeout ?? true
       // Create stream
       // TODO: Maybe handle errors better
-      await createStream(conn, def).catch()
+      // eslint-disable-next-line
+      await createStream(conn, def).catch(() => {})
       // Create pull consumer
       const ps = await createConsumer(conn, def)
       // Consumer config
@@ -157,7 +158,9 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
         } catch (e) {
           debug('error %O', e)
           const backoffMs = getNextBackoff(backoff, msg)
-          emit('error', { ...metadata, backoffMs, error: e })
+          const attemptsExhausted =
+            msg.info.redeliveryCount === consumerConfig.max_deliver
+          emit('error', { ...metadata, attemptsExhausted, backoffMs, error: e })
           debug('next backoff ms %d', backoffMs)
           // Negative ack message with backoff
           msg.nak(backoffMs)
