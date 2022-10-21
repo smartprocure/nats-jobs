@@ -1,3 +1,7 @@
+# 0.7.0
+
+* Added `durationMs` to `complete` and `error` events.
+
 # 0.6.0
 
 * Pass `attemptsExhausted` to `error` emitter indicating when the `redeliveryCount` equals `max_deliver`.

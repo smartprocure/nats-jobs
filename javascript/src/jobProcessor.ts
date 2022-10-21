@@ -94,6 +94,8 @@ const extendAckTimeout = (ackWait: Nanos, msg: JsMsg): NodeJS.Timer => {
   }, intervalMs)
 }
 
+const getDuration = (startTime: number) => new Date().getTime() - startTime
+
 /**
  * Call `start` to begin processing jobs based on def. To
  * gracefully shutdown call `stop` method.
@@ -143,6 +145,7 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
       for await (const msg of ps) {
         const metadata = { msgInfo: msg.info, consumerConfig }
         debug('received %O', metadata)
+        const startTime = new Date().getTime()
         deferred = defer()
         // Auto-extend ack timeout
         const extendAckTimer =
@@ -152,15 +155,23 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
           // Process the message
           await def.perform(msg, { signal: abortController.signal, def, js })
           debug('completed')
-          emit('complete', metadata)
+          const durationMs = getDuration(startTime)
+          emit('complete', { ...metadata, durationMs })
           // Ack message
           await msg.ackAck()
         } catch (e) {
           debug('error %O', e)
+          const durationMs = getDuration(startTime)
           const backoffMs = getNextBackoff(backoff, msg)
           const attemptsExhausted =
             msg.info.redeliveryCount === consumerConfig.max_deliver
-          emit('error', { ...metadata, attemptsExhausted, backoffMs, error: e })
+          emit('error', {
+            ...metadata,
+            attemptsExhausted,
+            durationMs,
+            backoffMs,
+            error: e,
+          })
           debug('next backoff ms %d', backoffMs)
           // Negative ack message with backoff
           msg.nak(backoffMs)
