@@ -122,15 +122,18 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
         const ackWait = consumerConfig.ack_wait
         const intervalMs = nanosToMs(ackWait) * extendAckTimeoutThresholdFactor
         return setInterval(() => {
-          debug('extend ack - wait: %d msg: %O', ackWait, msg.info)
+          debug('working')
+          emit('working', getMetadata(msg))
           msg.working()
         }, intervalMs)
       }
     }
 
-    const handleTimeout = (extendAckTimer?: NodeJS.Timer) => {
+    const handleTimeout = (msg: JsMsg, extendAckTimer?: NodeJS.Timer) => {
       if (extendAckTimer && def.timeout) {
         return setTimeout(() => {
+          debug('timeout')
+          emit('timeout', getMetadata(msg))
           // Stop delaying ack_wait timeout
           clearInterval(extendAckTimer)
           // Abort
@@ -138,6 +141,8 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
         }, def.timeout)
       }
     }
+
+    const getMetadata = (msg: JsMsg) => ({ msgInfo: msg.info, consumerConfig })
 
     const run = async () => {
       // Create stream
@@ -156,14 +161,14 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
       pullTimer = setInterval(pull, pullInterval)
       // Consume messages
       for await (const msg of ps) {
-        const metadata = { msgInfo: msg.info, consumerConfig }
+        const metadata = getMetadata(msg)
         debug('received %O', metadata)
         const startTime = new Date().getTime()
         deferred = defer()
         // Auto-extend ack timeout
         const extendAckTimer = extendAckTimeout(msg)
         // Handle timeout
-        const timeoutTimeout = handleTimeout(extendAckTimer)
+        const timeoutTimeout = handleTimeout(msg, extendAckTimer)
 
         try {
           emit('start', metadata)

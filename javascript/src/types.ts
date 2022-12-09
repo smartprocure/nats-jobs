@@ -1,9 +1,4 @@
-import {
-  ConsumerConfig,
-  JsMsg,
-  StreamConfig,
-  JetStreamClient,
-} from 'nats'
+import { ConsumerConfig, JsMsg, StreamConfig, JetStreamClient } from 'nats'
 
 export interface Context {
   signal: AbortSignal
@@ -26,8 +21,8 @@ export interface JobDef {
   autoExtendAckTimeout?: boolean
   perform(msg: JsMsg, context: Context): Promise<void>
   /**
-  * Timeout in ms on the perform. Only applies if autoExtendAckTimeout is true.
-  */
+   * Timeout in ms on the perform. Only applies if autoExtendAckTimeout is true.
+   */
   timeout?: number
 }
 
@@ -43,4 +38,4 @@ export interface BackoffOptions {
   repeatAfter?: number
 }
 
-export type Events = 'start' | 'complete' | 'error'
+export type Events = 'start' | 'working' | 'timeout' | 'complete' | 'error'
