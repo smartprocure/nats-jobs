@@ -1,3 +1,9 @@
+# 0.8.0
+
+* Added `performTimeout` option to `JobDef` with a default of 3 hours.
+* If the timeout is reached before the processing of the message completes, an error is thrown so that
+* further processing can continue by the NATS consumer
+
 # 0.7.0
 
 * Added `durationMs` to `complete` and `error` events.

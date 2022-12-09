@@ -1,9 +1,4 @@
-import {
-  ConsumerConfig,
-  JsMsg,
-  StreamConfig,
-  JetStreamClient,
-} from 'nats'
+import { ConsumerConfig, JsMsg, StreamConfig, JetStreamClient } from 'nats'
 
 export interface Context {
   signal: AbortSignal
@@ -22,6 +17,7 @@ export interface JobDef {
   numAttempts?: number
   autoExtendAckTimeout?: boolean
   perform(msg: JsMsg, context: Context): Promise<void>
+  performTimeout?: number
 }
 
 export interface Deferred<A> {
@@ -37,3 +33,14 @@ export interface BackoffOptions {
 }
 
 export type Events = 'start' | 'complete' | 'error'
+
+export class TimeoutError extends Error {
+  private timeout: number
+  private metadata: Record<string, unknown>
+  constructor(msg: string, timeout: number, metadata: Record<string, unknown>) {
+    super(msg)
+    this.timeout = timeout
+    this.metadata = metadata
+    Object.setPrototypeOf(this, TimeoutError.prototype)
+  }
+}

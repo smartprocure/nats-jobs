@@ -14,9 +14,10 @@ import {
 } from 'nats'
 import { nanos, defer, getNextBackoff, nanosToMs } from './util'
 import _debug from 'debug'
-import { Deferred, JobDef, StopFn, Events } from './types'
+import { Deferred, JobDef, StopFn, Events, TimeoutError } from './types'
 import _ from 'lodash/fp'
 import EventEmitter from 'eventemitter3'
+import bluebird from 'bluebird'
 
 const debug = _debug('nats-jobs')
 
@@ -124,6 +125,8 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
       const batch = def.batch ?? 10
       // Automatically extend the ack timeout by default
       const autoExtendAckTimeout = def.autoExtendAckTimeout ?? true
+      // Perform timeout in ms
+      const performTimeout = def.performTimeout ?? ms('3h')
       // Create stream
       // TODO: Maybe handle errors better
       // eslint-disable-next-line
@@ -153,7 +156,17 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
         try {
           emit('start', metadata)
           // Process the message
-          await def.perform(msg, { signal: abortController.signal, def, js })
+          const perform = def.perform(msg, {
+            signal: abortController.signal,
+            def,
+            js,
+          })
+          await bluebird
+            .resolve(perform)
+            .timeout(
+              performTimeout,
+              new TimeoutError('Perform timeout', performTimeout, metadata)
+            )
           debug('completed')
           const durationMs = getDuration(startTime)
           emit('complete', { ...metadata, durationMs })
