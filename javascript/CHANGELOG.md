@@ -1,3 +1,10 @@
+# 0.8.0
+
+* `timeout` option that will call `abort` on the abort signal if `perform` doesn't complete by
+`timeout` ms.
+* Default `batch` to 1 instead of 10.
+* `autoExtendAckTimeout` is disabled by default now.
+
 # 0.7.0
 
 * Added `durationMs` to `complete` and `error` events.

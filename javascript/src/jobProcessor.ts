@@ -10,7 +10,6 @@ import {
   ReplayPolicy,
   RetentionPolicy,
   StorageType,
-  Nanos,
 } from 'nats'
 import { nanos, defer, getNextBackoff, nanosToMs } from './util'
 import _debug from 'debug'
@@ -82,17 +81,6 @@ const createConsumer = (conn: NatsConnection, def: JobDef) => {
 }
 
 const extendAckTimeoutThresholdFactor = 0.75
-/**
- * Automatically extend the ack timeout by periodically telling NATS
- * we're working.
- */
-const extendAckTimeout = (ackWait: Nanos, msg: JsMsg): NodeJS.Timer => {
-  const intervalMs = nanosToMs(ackWait) * extendAckTimeoutThresholdFactor
-  return setInterval(() => {
-    debug('extend ack - wait: %d msg: %O', ackWait, msg.info)
-    msg.working()
-  }, intervalMs)
-}
 
 const getDuration = (startTime: number) => new Date().getTime() - startTime
 
@@ -111,9 +99,34 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
   }
 
   const start = (def: JobDef) => {
+    debug('job def %O', def)
     const abortController = new AbortController()
     let pullTimer: NodeJS.Timer
     let deferred: Deferred<void>
+    // How often to pull down messages from the consumer
+    const pullInterval = def.pullInterval ?? ms('1s')
+    // Retry a failed message after a second by default
+    const backoff = def.backoff ?? ms('1s')
+    // Pull down 1 message by default
+    const batch = def.batch ?? 1
+    // Consumer config
+    const consumerConfig = consumerDefaults(def)
+
+
+    /**
+     * Automatically extend the ack timeout by periodically telling NATS
+     * we're working.
+     */
+    const extendAckTimeout = (msg: JsMsg) => {
+      if (def.autoExtendAckTimeout) {
+        const ackWait = consumerConfig.ack_wait
+        const intervalMs = nanosToMs(ackWait) * extendAckTimeoutThresholdFactor
+        return setInterval(() => {
+          debug('extend ack - wait: %d msg: %O', ackWait, msg.info)
+          msg.working()
+        }, intervalMs)
+      }
+    }
 
     const handleTimeout = (extendAckTimer?: NodeJS.Timer) => {
       if (extendAckTimer && def.timeout) {
@@ -127,23 +140,12 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
     }
 
     const run = async () => {
-      debug('job def %O', def)
-      const pullInterval = def.pullInterval ?? ms('1s')
-      // Retry a failed message after a second by default
-      const backoff = def.backoff ?? ms('1s')
-      // Pull down 1 message by default
-      const batch = def.batch ?? 1
-      // Optionally automatically extend the ack timeout
-      const autoExtendAckTimeout = def.autoExtendAckTimeout
       // Create stream
       // TODO: Maybe handle errors better
       // eslint-disable-next-line
       await createStream(conn, def).catch(() => {})
       // Create pull consumer
       const ps = await createConsumer(conn, def)
-      // Consumer config
-      const consumerConfig = consumerDefaults(def)
-      const ackWait = consumerConfig.ack_wait
       // Pull messages from the consumer
       const pull = () => {
         ps.pull({ batch, expires: pullInterval })
@@ -159,9 +161,7 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
         const startTime = new Date().getTime()
         deferred = defer()
         // Auto-extend ack timeout
-        const extendAckTimer = autoExtendAckTimeout
-          ? extendAckTimeout(ackWait, msg)
-          : undefined
+        const extendAckTimer = extendAckTimeout(msg)
         // Handle timeout
         const timeoutTimeout = handleTimeout(extendAckTimer)
 
