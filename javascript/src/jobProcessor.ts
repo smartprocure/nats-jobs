@@ -112,18 +112,29 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
 
   const start = (def: JobDef) => {
     const abortController = new AbortController()
-    let timer: NodeJS.Timer
+    let pullTimer: NodeJS.Timer
     let deferred: Deferred<void>
+
+    const handleTimeout = (extendAckTimer?: NodeJS.Timer) => {
+      if (extendAckTimer && def.timeout) {
+        return setTimeout(() => {
+          // Stop delaying ack_wait timeout
+          clearInterval(extendAckTimer)
+          // Abort
+          abortController.abort()
+        }, def.timeout)
+      }
+    }
 
     const run = async () => {
       debug('job def %O', def)
       const pullInterval = def.pullInterval ?? ms('1s')
       // Retry a failed message after a second by default
       const backoff = def.backoff ?? ms('1s')
-      // Pull down 10 messages by default
-      const batch = def.batch ?? 10
-      // Automatically extend the ack timeout by default
-      const autoExtendAckTimeout = def.autoExtendAckTimeout ?? true
+      // Pull down 1 message by default
+      const batch = def.batch ?? 1
+      // Optionally automatically extend the ack timeout
+      const autoExtendAckTimeout = def.autoExtendAckTimeout
       // Create stream
       // TODO: Maybe handle errors better
       // eslint-disable-next-line
@@ -140,7 +151,7 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
       // Do the initial pull
       pull()
       // Pull regularly
-      timer = setInterval(pull, pullInterval)
+      pullTimer = setInterval(pull, pullInterval)
       // Consume messages
       for await (const msg of ps) {
         const metadata = { msgInfo: msg.info, consumerConfig }
@@ -148,8 +159,12 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
         const startTime = new Date().getTime()
         deferred = defer()
         // Auto-extend ack timeout
-        const extendAckTimer =
-          autoExtendAckTimeout && extendAckTimeout(ackWait, msg)
+        const extendAckTimer = autoExtendAckTimeout
+          ? extendAckTimeout(ackWait, msg)
+          : undefined
+        // Handle timeout
+        const timeoutTimeout = handleTimeout(extendAckTimer)
+
         try {
           emit('start', metadata)
           // Process the message
@@ -176,9 +191,13 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
           // Negative ack message with backoff
           msg.nak(backoffMs)
         } finally {
-          // Clear auto-extend timer
+          // Clear ack_wait timeout delay timer
           if (extendAckTimer) {
             clearInterval(extendAckTimer)
+          }
+          // Clear timeout
+          if (timeoutTimeout) {
+            clearTimeout(timeoutTimeout)
           }
           deferred.done()
         }
@@ -193,7 +212,7 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
       // Send abort signal to perform
       abortController.abort()
       // Don't pull any more messages
-      clearInterval(timer)
+      clearInterval(pullTimer)
       // Wait for current message to finish processing
       return deferred?.promise
     }

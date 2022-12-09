@@ -20,8 +20,15 @@ export interface JobDef {
   batch?: number
   backoff?: number | number[]
   numAttempts?: number
+  /**
+   * Automatically delay the ack_wait timeout.
+   */
   autoExtendAckTimeout?: boolean
   perform(msg: JsMsg, context: Context): Promise<void>
+  /**
+  * Timeout in ms on the perform. Only applies if autoExtendAckTimeout is true.
+  */
+  timeout: number
 }
 
 export interface Deferred<A> {
