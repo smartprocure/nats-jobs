@@ -215,6 +215,7 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
     }
 
     const stop = () => {
+      emit('stop', { consumerConfig })
       // Set this to true so we don't process any more messages
       stopping = true
       // Don't pull any more messages

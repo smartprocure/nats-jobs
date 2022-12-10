@@ -38,4 +38,10 @@ export interface BackoffOptions {
   repeatAfter?: number
 }
 
-export type Events = 'start' | 'working' | 'timeout' | 'complete' | 'error'
+export type Events =
+  | 'start'
+  | 'stop'
+  | 'working'
+  | 'timeout'
+  | 'complete'
+  | 'error'
