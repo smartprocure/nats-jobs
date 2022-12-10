@@ -111,7 +111,8 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
     const batch = def.batch ?? 1
     // Consumer config
     const consumerConfig = consumerDefaults(def)
-
+    // Flag that indicates the stop function was called
+    let stopping = false
 
     /**
      * Automatically extend the ack timeout by periodically telling NATS
@@ -134,10 +135,10 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
         return setTimeout(() => {
           debug('timeout')
           emit('timeout', getMetadata(msg))
+          // Abort
+          abortController.abort('timeout')
           // Stop delaying ack_wait timeout
           clearInterval(extendAckTimer)
-          // Abort
-          abortController.abort()
         }, def.timeout)
       }
     }
@@ -206,18 +207,20 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
           }
           deferred.done()
         }
-        // Don't process any more messages if stopping
-        if (abortController.signal.aborted) {
+        // Don't process any more messages
+        if (stopping) {
           return
         }
       }
     }
 
     const stop = () => {
-      // Send abort signal to perform
-      abortController.abort()
+      // Set this to true so we don't process any more messages
+      stopping = true
       // Don't pull any more messages
       clearInterval(pullTimer)
+      // Send abort signal to perform
+      abortController.abort('stopping')
       // Wait for current message to finish processing
       return deferred?.promise
     }

@@ -13,6 +13,7 @@
   "scripts": {
     "prepare": "npm run lint && npm run test && npm run build",
     "build": "npm run clean && tsc --declaration",
+    "build:develop": "tsc --watch",
     "clean": "rm -rf dist",
     "test": "jest",
     "prettier": "prettier --ignore-path .gitignore --write './**/*.ts'",
@@ -50,7 +51,6 @@
     "@types/debug": "^4.1.7",
     "@types/jest": "^28.1.1",
     "@types/lodash": "^4.14.182",
-    "@types/node": "^17.0.31",
     "@types/node-schedule": "^1.3.2",
     "@typescript-eslint/eslint-plugin": "^5.27.1",
     "eslint": "^8.13.0",
@@ -61,6 +61,6 @@
     "redlock": "^5.0.0-beta.2",
     "ts-jest": "^28.0.4",
     "ts-node": "^10.7.0",
-    "typescript": "^4.6.4"
+    "typescript": "^4.9.4"
   }
 }

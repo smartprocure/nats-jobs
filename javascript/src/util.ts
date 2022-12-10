@@ -1,6 +1,6 @@
 import ms from 'ms'
-import { BackoffOptions, Deferred } from './types'
-import { JsMsg, Nanos } from 'nats'
+import type { BackoffOptions, Deferred } from './types'
+import type { JsMsg, Nanos } from 'nats'
 
 export const nanos = (x: string) => ms(x) * 1e6
 export const nanosToMs = (x: Nanos | undefined) => (x ? x / 1e6 : 0)

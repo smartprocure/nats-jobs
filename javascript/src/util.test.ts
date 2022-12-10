@@ -1,5 +1,5 @@
 import { describe, expect, test } from '@jest/globals'
-import { JsMsg } from 'nats'
+import type { JsMsg } from 'nats'
 import { getNextBackoff, expBackoff } from './util'
 
 describe('getNextBackoff', () => {
