@@ -1,11 +1,13 @@
 /*
- * Demonstrates perform timeout using the `performTimeout` option on JobDef.
+ * Demonstrates perform timeout using the `timeout` option on JobDef.
  *
  * To Test:
  *
  * (1) Run script: npx ts-node examples/timeout.ts
  * (2) Publish a message: nats pub ORDERS someText
- * (3) Wait one second to see the message be rejected with a timeout error.
+ * (3) Wait eight seconds before the process is exited due to a timeout.
+ * Alternatively, send SIGINT and notice how proccessing of the message
+ * completes despite the timeout occurring.
  *
  * Requires NATS to be running.
  */
