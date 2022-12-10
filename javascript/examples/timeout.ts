@@ -23,6 +23,7 @@ const def: JobDef = {
   async perform(msg: JsMsg, { signal }: Context) {
     signal.onabort = () => {
       console.log('Aborted:', signal.reason)
+      // Exit if a timeout occurred
       if (signal.reason === 'timeout') {
         process.exit(1)
       }
@@ -31,7 +32,7 @@ const def: JobDef = {
     await setTimeout(ms('10s'))
     console.log(`Completed ${msg.info.streamSequence}`)
   },
-  timeout: ms('8s'),
+  timeoutMs: ms('8s'),
   numAttempts: 1,
   autoExtendAckTimeout: true,
   consumerConfig: { ack_wait: nanos('5s') },

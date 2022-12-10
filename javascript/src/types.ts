@@ -23,7 +23,7 @@ export interface JobDef {
   /**
    * Timeout in ms on the perform. Only applies if autoExtendAckTimeout is true.
    */
-  timeout?: number
+  timeoutMs?: number
 }
 
 export interface Deferred<A> {

@@ -80,7 +80,7 @@ const createConsumer = (conn: NatsConnection, def: JobDef) => {
   })
 }
 
-const extendAckTimeoutThresholdFactor = 0.75
+const extendAckTimeoutThresholdFactor = 0.8
 
 const getDuration = (startTime: number) => new Date().getTime() - startTime
 
@@ -124,22 +124,23 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
         const intervalMs = nanosToMs(ackWait) * extendAckTimeoutThresholdFactor
         return setInterval(() => {
           debug('working')
-          emit('working', getMetadata(msg))
+          emit('working', { ...getMetadata(msg), intervalMs })
           msg.working()
         }, intervalMs)
       }
     }
 
     const handleTimeout = (msg: JsMsg, extendAckTimer?: NodeJS.Timer) => {
-      if (extendAckTimer && def.timeout) {
+      const timeoutMs = def.timeoutMs
+      if (extendAckTimer && timeoutMs) {
         return setTimeout(() => {
           debug('timeout')
-          emit('timeout', getMetadata(msg))
+          emit('timeout', { ...getMetadata(msg), timeoutMs })
           // Abort
           abortController.abort('timeout')
           // Stop delaying ack_wait timeout
           clearInterval(extendAckTimer)
-        }, def.timeout)
+        }, timeoutMs)
       }
     }
 
