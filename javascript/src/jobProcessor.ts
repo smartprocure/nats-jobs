@@ -11,7 +11,7 @@ import {
   RetentionPolicy,
   StorageType,
 } from 'nats'
-import { nanos, defer, getNextBackoff, nanosToMs } from './util'
+import { nanos, defer, getNextBackoff, nanosToMs, repeater } from './util'
 import _debug from 'debug'
 import { Deferred, JobDef, StopFn, Events } from './types'
 import _ from 'lodash/fp'
@@ -101,10 +101,9 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
   const start = (def: JobDef) => {
     debug('job def %O', def)
     const abortController = new AbortController()
-    let pullTimer: NodeJS.Timer
     let deferred: Deferred<void>
     // How often to pull down messages from the consumer
-    const pullInterval = def.pullInterval ?? ms('1s')
+    const pullInterval = def.pullInterval ?? ms('30s')
     // Retry a failed message after a second by default
     const backoff = def.backoff ?? ms('1s')
     // Pull down 1 message by default
@@ -152,15 +151,14 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
       // Create pull consumer
       const ps = await createConsumer(conn, def)
       // Pull messages from the consumer
-      const pull = () => {
+      const puller = repeater(() => {
         ps.pull({ batch, expires: pullInterval })
-      }
-      // Do the initial pull
-      pull()
-      // Pull regularly
-      pullTimer = setInterval(pull, pullInterval)
+      }, pullInterval)
+      // Start pulling messages
+      puller.start()
       // Consume messages
       for await (const msg of ps) {
+        puller.stop()
         const metadata = getMetadata(msg)
         debug('received %O', metadata)
         const startTime = new Date().getTime()
@@ -206,6 +204,8 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
         if (stopping) {
           return
         }
+        // Pull the next message
+        puller.start()
       }
     }
 
@@ -214,8 +214,6 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
       emit('stop', { consumerConfig })
       // Set this to true so we don't process any more messages
       stopping = true
-      // Don't pull any more messages
-      clearInterval(pullTimer)
       // Send abort signal to perform
       abortController.abort('stop')
       // Wait for current message to finish processing
