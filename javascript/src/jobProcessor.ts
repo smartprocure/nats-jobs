@@ -130,16 +130,14 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
       }
     }
 
-    const handleTimeout = (msg: JsMsg, extendAckTimer?: NodeJS.Timer) => {
+    const handleTimeout = (msg: JsMsg) => {
       const timeoutMs = def.timeoutMs
-      if (extendAckTimer && timeoutMs) {
+      if (timeoutMs) {
         return setTimeout(() => {
           debug('timeout')
           emit('timeout', { ...getMetadata(msg), timeoutMs })
           // Abort
           abortController.abort('timeout')
-          // Stop delaying ack_wait timeout
-          clearInterval(extendAckTimer)
         }, timeoutMs)
       }
     }
@@ -170,7 +168,7 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
         // Auto-extend ack timeout
         const extendAckTimer = extendAckTimeout(msg)
         // Handle timeout
-        const timeoutTimeout = handleTimeout(msg, extendAckTimer)
+        const timeoutTimeout = handleTimeout(msg)
 
         try {
           emit('start', metadata)
@@ -198,14 +196,10 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
           // Negative ack message with backoff
           msg.nak(backoffMs)
         } finally {
-          // Clear ack_wait timeout delay timer
-          if (extendAckTimer) {
-            clearInterval(extendAckTimer)
-          }
           // Clear timeout
-          if (timeoutTimeout) {
-            clearTimeout(timeoutTimeout)
-          }
+          clearTimeout(timeoutTimeout)
+          // Clear ack_wait timeout delay timer
+          clearInterval(extendAckTimer)
           deferred.done()
         }
         // Don't process any more messages
@@ -216,13 +210,14 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
     }
 
     const stop = () => {
+      debug('stop')
       emit('stop', { consumerConfig })
       // Set this to true so we don't process any more messages
       stopping = true
       // Don't pull any more messages
       clearInterval(pullTimer)
       // Send abort signal to perform
-      abortController.abort('stopping')
+      abortController.abort('stop')
       // Wait for current message to finish processing
       return deferred?.promise
     }
@@ -252,7 +247,9 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
   }
 
   const stop = async () => {
+    // Call stop on all jobs
     await Promise.all(stopFns.map((stop) => stop()))
+    // Close NATS connection
     await conn.close()
   }
   return {
