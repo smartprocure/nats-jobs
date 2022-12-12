@@ -33,10 +33,10 @@ const run = async () => {
   processor.emitter.on('complete', console.info)
   processor.emitter.on('error', console.error)
   // Start processing messages
-  const ordersJob = processor.start(def)
+  processor.start(def)
   // Gracefully handle signals
   const shutDown = async () => {
-    await ordersJob.stop()
+    await processor.stop()
     process.exit(0)
   }
   process.on('SIGTERM', shutDown)
