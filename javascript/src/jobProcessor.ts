@@ -193,9 +193,9 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
           // Negative ack message with backoff
           msg.nak(backoffMs)
         } finally {
-          // Clear timeout
+          // Clear timeout timeout
           clearTimeout(timeoutTimeout)
-          // Clear ack_wait timeout delay timer
+          // Clear ack_wait delay timer
           clearInterval(extendAckTimer)
           deferred.done()
         }
