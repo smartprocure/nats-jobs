@@ -5,6 +5,7 @@
 `timeoutMs` ms.
 * Default `batch` to 1 instead of 10.
 * `autoExtendAckTimeout` is disabled by default now.
+* Remove all event listeners when `stop` is called on `jobProcessor`.
 * Latest NATS and Typescript.
 * Events have changed: 
 ```ts

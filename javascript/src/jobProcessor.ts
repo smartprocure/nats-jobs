@@ -243,6 +243,8 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
   const stop = async () => {
     // Call stop on all jobs
     await Promise.all(stopFns.map((stop) => stop()))
+    // Remove all event listeners
+    emitter.removeAllListeners()
     // Close NATS connection
     await conn.close()
   }

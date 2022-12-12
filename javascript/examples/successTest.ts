@@ -29,6 +29,8 @@ const def = {
 }
 const run = async () => {
   const processor = await jobProcessor()
+  processor.emitter.on('start', console.info)
+  processor.emitter.on('stop', console.info)
   processor.emitter.on('receive', console.info)
   processor.emitter.on('complete', console.info)
   processor.emitter.on('error', console.error)
