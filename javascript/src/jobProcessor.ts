@@ -89,8 +89,6 @@ const createConsumer = (conn: NatsConnection, def: JobDef) => {
 
 const extendAckTimeoutThresholdFactor = 0.8
 
-const getDuration = (startTime: number) => new Date().getTime() - startTime
-
 /**
  * Call `start` to begin processing jobs based on def. To
  * gracefully shutdown call `stop` method.
