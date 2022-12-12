@@ -29,6 +29,7 @@ const def: JobDef = {
       }
     }
     console.log(`Started ${msg.info.streamSequence}`)
+    // Simulate work
     await setTimeout(ms('10s'))
     console.log(`Completed ${msg.info.streamSequence}`)
   },
@@ -40,7 +41,7 @@ const def: JobDef = {
 const run = async () => {
   const processor = await jobProcessor()
   // Start processing messages
-  const ordersJob = processor.start(def)
+  processor.start(def)
   processor.emitter.on('start', console.info)
   processor.emitter.on('receive', console.info)
   processor.emitter.on('complete', console.info)
@@ -50,8 +51,7 @@ const run = async () => {
 
   // Gracefully handle signals
   const shutDown = async () => {
-    await ordersJob.stop()
-    process.exit(0)
+    await processor.stop()
   }
   process.on('SIGTERM', shutDown)
   process.on('SIGINT', shutDown)
