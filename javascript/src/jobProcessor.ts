@@ -152,12 +152,13 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
       const ps = await createConsumer(conn, def)
       // Pull messages from the consumer
       const puller = repeater(() => {
-        ps.pull({ batch, expires: pullInterval })
+        ps.pull({ batch, expires: pullInterval - 500 })
       }, pullInterval)
-      // Start pulling messages
+      // Pull the next message(s)
       puller.start()
       // Consume messages
       for await (const msg of ps) {
+        // Don't pull messages while processing message(s)
         puller.stop()
         const metadata = getMetadata(msg)
         debug('received %O', metadata)
@@ -204,7 +205,7 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
         if (stopping) {
           return
         }
-        // Pull the next message
+        // Pull the next message(s)
         puller.start()
       }
     }

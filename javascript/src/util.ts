@@ -53,6 +53,7 @@ export const getNextBackoff = (backoff: number | number[], msg: JsMsg) => {
 export const repeater = (fn: () => void, delay: number) => {
   let timer: NodeJS.Timer
   const start = () => {
+    fn()
     timer = setInterval(fn, delay)
   }
   const stop = () => {
