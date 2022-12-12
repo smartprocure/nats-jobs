@@ -103,6 +103,10 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
     emit('start', def)
     const abortController = new AbortController()
     let deferred: Deferred<void>
+    // Flag that indicates the stop function was called
+    let stopping = false
+    // Pull messages repeatedly
+    let puller: ReturnType<typeof repeater>
     // How often to pull down messages from the consumer
     const pullInterval = def.pullInterval ?? ms('30s')
     // How long to wait for the batch of messages
@@ -113,8 +117,6 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
     const batch = def.batch ?? 1
     // Consumer config
     const consumerConfig = consumerDefaults(def)
-    // Flag that indicates the stop function was called
-    let stopping = false
 
     /**
      * Automatically extend the ack timeout by periodically telling NATS
@@ -154,7 +156,7 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
       // Create pull consumer
       const ps = await createConsumer(conn, def)
       // Pull messages from the consumer
-      const puller = repeater(() => {
+      puller = repeater(() => {
         emit('pull', { consumerConfig, batch, expires })
         ps.pull({ batch, expires })
       }, pullInterval)
@@ -206,14 +208,16 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
       }
     }
 
-    const stop = () => {
+    const stop = async () => {
       emit('stop', { consumerConfig })
       // Set this to true so we don't process any more messages
       stopping = true
+      // Don't pull new messages
+      puller?.stop()
       // Send abort signal to perform
       abortController.abort('stop')
       // Wait for current message to finish processing
-      return deferred?.promise
+      await deferred?.promise
     }
     // Track all stop fns so we can shutdown with one call
     stopFns.push(stop)

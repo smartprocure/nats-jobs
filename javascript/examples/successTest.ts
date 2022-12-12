@@ -39,7 +39,6 @@ const run = async () => {
   // Gracefully handle signals
   const shutDown = async () => {
     await processor.stop()
-    process.exit(0)
   }
   process.on('SIGTERM', shutDown)
   process.on('SIGINT', shutDown)
