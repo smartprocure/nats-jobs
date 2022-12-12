@@ -27,6 +27,7 @@ const def = {
     }
     console.log(`Completed ${msg.info.streamSequence}`)
   },
+  autoExtendAckTimeout: true,
 }
 const run = async () => {
   const processor = await jobProcessor()

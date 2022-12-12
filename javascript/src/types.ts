@@ -24,6 +24,8 @@ export interface JobDef {
   perform(msg: JsMsg, context: Context): Promise<void>
   /** Timeout in ms on the perform. Abort signal will trigger if timeout is reached. */
   timeoutMs?: number
+  /** Expected time in ms for perform to complete. */
+  expectedMs?: number
 }
 
 export interface Deferred<A> {
@@ -55,3 +57,5 @@ export type Events =
   | 'pull'
   // Stop processing messages
   | 'stop'
+  // NATS did not ack the ack
+  | 'noAck'

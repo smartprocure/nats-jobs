@@ -152,6 +152,8 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
     const getMetadata = (msg: JsMsg) => ({ msgInfo: msg.info, consumerConfig })
     const areAttemptsExhausted = (msg: JsMsg) =>
       msg.info.redeliveryCount === consumerConfig.max_deliver
+    const getExceededMs = (durationMs: number) =>
+      def.expectedMs ? durationMs - def.expectedMs : 0
 
     const run = async () => {
       // Create stream
@@ -186,16 +188,27 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
         try {
           // Process the message
           await def.perform(msg, { signal: abortController.signal, def, js })
-          emit('complete', { ...metadata, durationMs: watch.stop() })
+          const durationMs = watch.stop()
+          emit('complete', {
+            ...metadata,
+            durationMs,
+            exceededMs: getExceededMs(durationMs),
+          })
           // Ack message and wait for NATS to ack the ack
-          await msg.ackAck()
+          const succeeded = await msg.ackAck()
+          // Ack failed
+          if (!succeeded) {
+            emit('noAck', metadata)
+          }
         } catch (e) {
           const backoffMs = getNextBackoff(backoff, msg)
+          const durationMs = watch.stop()
           emit('error', {
             ...metadata,
             attemptsExhausted: areAttemptsExhausted(msg),
-            durationMs: watch.stop(),
+            durationMs,
             backoffMs,
+            exceededMs: getExceededMs(durationMs),
             error: e,
           })
           // Negative ack message with backoff

@@ -14,9 +14,10 @@ import ms from 'ms'
 import { JsMsg } from 'nats'
 import { setTimeout } from 'node:timers/promises'
 import { jobProcessor } from '../src/jobProcessor'
+import { JobDef } from '../src/types'
 import { expBackoff } from '../src/util'
 
-const def = {
+const def: JobDef = {
   stream: 'ORDERS',
   backoff: expBackoff(1000),
   async perform(msg: JsMsg) {
@@ -26,6 +27,7 @@ const def = {
     await setTimeout(ms('10s'))
     console.log(`Completed ${msg.info.streamSequence}`)
   },
+  expectedMs: ms('12s'),
 }
 const run = async () => {
   const processor = await jobProcessor()
@@ -34,6 +36,7 @@ const run = async () => {
   processor.emitter.on('receive', console.info)
   processor.emitter.on('complete', console.info)
   processor.emitter.on('error', console.error)
+  processor.emitter.on('noAck', console.warn)
   // Start processing messages
   processor.start(def)
   // Gracefully handle signals

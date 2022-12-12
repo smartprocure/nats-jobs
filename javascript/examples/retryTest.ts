@@ -33,6 +33,7 @@ const def = {
     await setTimeout(ms('5s'))
     throw 'fail'
   },
+  expectedMs: ms('4s'),
 }
 
 const run = async () => {
