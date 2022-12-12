@@ -1,8 +1,9 @@
 # 0.8.0
 
 * Don't pull message(s) while processing a message.
-* `timeoutMs` option that will call `abort` on the abort signal if `perform` doesn't complete by
+* Added `timeoutMs` option that will call `abort` on the abort signal if `perform` doesn't complete by
 `timeoutMs` ms.
+* Added `expectedMs` value to `JobDef` that is logged when a job completes or errors.
 * Default `batch` to 1 instead of 10.
 * `autoExtendAckTimeout` is disabled by default now.
 * Remove all event listeners when `stop` is called on `jobProcessor`.
