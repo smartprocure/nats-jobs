@@ -39,9 +39,17 @@ export interface BackoffOptions {
 }
 
 export type Events =
-  | 'start'
-  | 'stop'
+  // Message received
+  | 'receive'
+  // Tell NATS we're still working
   | 'working'
-  | 'timeout'
+  // Message processing complete
   | 'complete'
+  // Error processing message
   | 'error'
+  // Timeout occurred while processing message
+  | 'timeout'
+  // Pull the next message(s)
+  | 'pull'
+  // Stop processing messages
+  | 'stop'

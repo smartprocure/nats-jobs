@@ -95,6 +95,7 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
   const stopFns: StopFn[] = []
   const emitter = new EventEmitter<Events>()
   const emit = (event: Events, data: object) => {
+    debug(event)
     emitter.emit(event, { type: event, ...data })
   }
 
@@ -104,6 +105,8 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
     let deferred: Deferred<void>
     // How often to pull down messages from the consumer
     const pullInterval = def.pullInterval ?? ms('30s')
+    // How long to wait for the batch of messages
+    const expires = pullInterval - 500
     // Retry a failed message after a second by default
     const backoff = def.backoff ?? ms('1s')
     // Pull down 1 message by default
@@ -122,7 +125,6 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
         const ackWait = consumerConfig.ack_wait
         const intervalMs = nanosToMs(ackWait) * extendAckTimeoutThresholdFactor
         return setInterval(() => {
-          debug('working')
           emit('working', { ...getMetadata(msg), intervalMs })
           msg.working()
         }, intervalMs)
@@ -133,7 +135,6 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
       const timeoutMs = def.timeoutMs
       if (timeoutMs) {
         return setTimeout(() => {
-          debug('timeout')
           emit('timeout', { ...getMetadata(msg), timeoutMs })
           // Abort
           abortController.abort('timeout')
@@ -152,16 +153,17 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
       const ps = await createConsumer(conn, def)
       // Pull messages from the consumer
       const puller = repeater(() => {
-        ps.pull({ batch, expires: pullInterval - 500 })
+        emit('pull', { consumerConfig, batch, expires })
+        ps.pull({ batch, expires })
       }, pullInterval)
       // Pull the next message(s)
       puller.start()
       // Consume messages
       for await (const msg of ps) {
-        // Don't pull messages while processing message(s)
+        // Don't pull while processing message(s)
         puller.stop()
         const metadata = getMetadata(msg)
-        debug('received %O', metadata)
+        emit('receive', metadata)
         const startTime = new Date().getTime()
         deferred = defer()
         // Auto-extend ack timeout
@@ -170,28 +172,21 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
         const timeoutTimeout = handleTimeout(msg)
 
         try {
-          emit('start', metadata)
           // Process the message
           await def.perform(msg, { signal: abortController.signal, def, js })
-          debug('completed')
-          const durationMs = getDuration(startTime)
-          emit('complete', { ...metadata, durationMs })
-          // Ack message
+          emit('complete', { ...metadata, durationMs: getDuration(startTime) })
+          // Ack message and wait for NATS to ack the ack
           await msg.ackAck()
         } catch (e) {
-          debug('error %O', e)
-          const durationMs = getDuration(startTime)
           const backoffMs = getNextBackoff(backoff, msg)
-          const attemptsExhausted =
-            msg.info.redeliveryCount === consumerConfig.max_deliver
           emit('error', {
             ...metadata,
-            attemptsExhausted,
-            durationMs,
+            attemptsExhausted:
+              msg.info.redeliveryCount === consumerConfig.max_deliver,
+            durationMs: getDuration(startTime),
             backoffMs,
             error: e,
           })
-          debug('next backoff ms %d', backoffMs)
           // Negative ack message with backoff
           msg.nak(backoffMs)
         } finally {
@@ -211,7 +206,6 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
     }
 
     const stop = () => {
-      debug('stop')
       emit('stop', { consumerConfig })
       // Set this to true so we don't process any more messages
       stopping = true
