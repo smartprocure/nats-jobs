@@ -42,11 +42,11 @@ const run = async () => {
   // Start processing messages
   const ordersJob = processor.start(def)
   processor.emitter.on('start', console.info)
-  processor.emitter.on('stop', console.info)
+  processor.emitter.on('receive', console.info)
   processor.emitter.on('complete', console.info)
-  processor.emitter.on('working', console.info)
   processor.emitter.on('timeout', console.info)
   processor.emitter.on('error', console.error)
+  processor.emitter.on('stop', console.info)
 
   // Gracefully handle signals
   const shutDown = async () => {

@@ -95,7 +95,7 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
   const stopFns: StopFn[] = []
   const emitter = new EventEmitter<Events>()
   const emit = (event: Events, data: object) => {
-    debug(event)
+    debug(`${event} %O`, data)
     emitter.emit(event, { type: event, ...data })
   }
 

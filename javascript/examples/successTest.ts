@@ -10,6 +10,7 @@
  *
  * Requires NATS to be running.
  */
+import ms from 'ms'
 import { JsMsg } from 'nats'
 import { setTimeout } from 'node:timers/promises'
 import { jobProcessor } from '../src/jobProcessor'
@@ -22,13 +23,13 @@ const def = {
     console.log(`Started ${msg.info.streamSequence}`)
     console.log(msg.data.toString())
     // Simulate work
-    await setTimeout(5000)
+    await setTimeout(ms('10s'))
     console.log(`Completed ${msg.info.streamSequence}`)
   },
 }
 const run = async () => {
   const processor = await jobProcessor()
-  processor.emitter.on('start', console.info)
+  processor.emitter.on('receive', console.info)
   processor.emitter.on('complete', console.info)
   processor.emitter.on('error', console.error)
   // Start processing messages

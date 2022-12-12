@@ -11,18 +11,18 @@ export interface JobDef {
   streamConfig?: Partial<StreamConfig>
   consumerConfig?: Partial<ConsumerConfig>
   filterSubject?: string
+  /** How often to pull down messages from the consumer. */
   pullInterval?: number
+  /** How many messages to pull at one time. */
   batch?: number
+  /** Time to wait before reprocessing the message if processing fails. */
   backoff?: number | number[]
+  /** How many times to attempt to process the message. */
   numAttempts?: number
-  /**
-   * Automatically delay the ack_wait timeout.
-   */
+  /** Automatically delay the ack_wait timeout. */
   autoExtendAckTimeout?: boolean
   perform(msg: JsMsg, context: Context): Promise<void>
-  /**
-   * Timeout in ms on the perform. Only applies if autoExtendAckTimeout is true.
-   */
+  /** Timeout in ms on the perform. Abort signal will trigger if timeout is reached. */
   timeoutMs?: number
 }
 
