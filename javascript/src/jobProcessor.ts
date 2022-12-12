@@ -11,7 +11,14 @@ import {
   RetentionPolicy,
   StorageType,
 } from 'nats'
-import { nanos, defer, getNextBackoff, nanosToMs, repeater } from './util'
+import {
+  nanos,
+  defer,
+  getNextBackoff,
+  nanosToMs,
+  repeater,
+  stopwatch,
+} from './util'
 import _debug from 'debug'
 import { Deferred, JobDef, StopFn, Events } from './types'
 import _ from 'lodash/fp'
@@ -162,23 +169,26 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
       }, pullInterval)
       // Pull the next message(s)
       puller.start()
+      // Stopwatch
+      const watch = stopwatch()
       // Consume messages
       for await (const msg of ps) {
         // Don't pull while processing message(s)
         puller.stop()
         const metadata = getMetadata(msg)
         emit('receive', metadata)
-        const startTime = new Date().getTime()
         deferred = defer()
         // Auto-extend ack timeout
         const extendAckTimer = extendAckTimeout(msg)
         // Handle timeout
         const timeoutTimeout = handleTimeout(msg)
+        // Start job stopwatch
+        watch.start()
 
         try {
           // Process the message
           await def.perform(msg, { signal: abortController.signal, def, js })
-          emit('complete', { ...metadata, durationMs: getDuration(startTime) })
+          emit('complete', { ...metadata, durationMs: watch.stop() })
           // Ack message and wait for NATS to ack the ack
           await msg.ackAck()
         } catch (e) {
@@ -186,7 +196,7 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
           emit('error', {
             ...metadata,
             attemptsExhausted: areAttemptsExhausted(msg),
-            durationMs: getDuration(startTime),
+            durationMs: watch.stop(),
             backoffMs,
             error: e,
           })

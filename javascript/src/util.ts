@@ -50,14 +50,29 @@ export const getNextBackoff = (backoff: number | number[], msg: JsMsg) => {
   return backoff
 }
 
-export const repeater = (fn: () => void, delay: number) => {
+/**
+ * Call fn on an interval.
+ */
+export const repeater = (fn: () => void, interval: number) => {
   let timer: NodeJS.Timer
   const start = () => {
     fn()
-    timer = setInterval(fn, delay)
+    timer = setInterval(fn, interval)
   }
   const stop = () => {
     clearInterval(timer)
   }
+  return { start, stop }
+}
+
+/**
+ * Calculate elapsed time in milliseconds.
+ */
+export const stopwatch = () => {
+  let startTime: number
+  const start = () => {
+    startTime = new Date().getTime()
+  }
+  const stop = () => new Date().getTime() - startTime
   return { start, stop }
 }
