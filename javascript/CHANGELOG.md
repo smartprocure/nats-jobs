@@ -1,9 +1,31 @@
 # 0.8.0
 
+* Don't pull message(s) while processing a message.
 * `timeoutMs` option that will call `abort` on the abort signal if `perform` doesn't complete by
 `timeoutMs` ms.
 * Default `batch` to 1 instead of 10.
 * `autoExtendAckTimeout` is disabled by default now.
+* Latest NATS and Typescript.
+* Events have changed: 
+```ts
+type Events =
+  // Start processing messages
+  | 'start'
+  // Message received
+  | 'receive'
+  // Tell NATS we're still working
+  | 'working'
+  // Message processing complete
+  | 'complete'
+  // Error processing message
+  | 'error'
+  // Timeout occurred while processing message
+  | 'timeout'
+  // Pull the next message(s)
+  | 'pull'
+  // Stop processing messages
+  | 'stop'
+```
 
 # 0.7.0
 
