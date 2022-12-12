@@ -39,6 +39,8 @@ export interface BackoffOptions {
 }
 
 export type Events =
+  // Start processing messages
+  | 'start'
   // Message received
   | 'receive'
   // Tell NATS we're still working

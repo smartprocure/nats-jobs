@@ -100,7 +100,7 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
   }
 
   const start = (def: JobDef) => {
-    debug('job def %O', def)
+    emit('start', def)
     const abortController = new AbortController()
     let deferred: Deferred<void>
     // How often to pull down messages from the consumer
@@ -143,6 +143,8 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
     }
 
     const getMetadata = (msg: JsMsg) => ({ msgInfo: msg.info, consumerConfig })
+    const areAttemptsExhausted = (msg: JsMsg) =>
+      msg.info.redeliveryCount === consumerConfig.max_deliver
 
     const run = async () => {
       // Create stream
@@ -181,8 +183,7 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
           const backoffMs = getNextBackoff(backoff, msg)
           emit('error', {
             ...metadata,
-            attemptsExhausted:
-              msg.info.redeliveryCount === consumerConfig.max_deliver,
+            attemptsExhausted: areAttemptsExhausted(msg),
             durationMs: getDuration(startTime),
             backoffMs,
             error: e,
