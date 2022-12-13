@@ -1,3 +1,34 @@
+# 0.8.0
+
+* Don't pull message(s) while processing a message.
+* Added `timeoutMs` option that will call `abort` on the abort signal if `perform` doesn't complete by
+`timeoutMs` ms.
+* Added `expectedMs` value to `JobDef` that is logged when a job completes or errors.
+* Default `batch` to 1 instead of 10.
+* `autoExtendAckTimeout` is disabled by default now.
+* Remove all event listeners when `stop` is called on `jobProcessor`.
+* Latest NATS and Typescript.
+* Events have changed: 
+```ts
+type Events =
+  // Start processing messages
+  | 'start'
+  // Message received
+  | 'receive'
+  // Tell NATS we're still working
+  | 'working'
+  // Message processing complete
+  | 'complete'
+  // Error processing message
+  | 'error'
+  // Timeout occurred while processing message
+  | 'timeout'
+  // Pull the next message(s)
+  | 'pull'
+  // Stop processing messages
+  | 'stop'
+```
+
 # 0.7.0
 
 * Added `durationMs` to `complete` and `error` events.

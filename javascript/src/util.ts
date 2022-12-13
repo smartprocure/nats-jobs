@@ -1,6 +1,6 @@
 import ms from 'ms'
-import { BackoffOptions, Deferred } from './types'
-import { JsMsg, Nanos } from 'nats'
+import type { BackoffOptions, Deferred } from './types'
+import type { JsMsg, Nanos } from 'nats'
 
 export const nanos = (x: string) => ms(x) * 1e6
 export const nanosToMs = (x: Nanos | undefined) => (x ? x / 1e6 : 0)
@@ -48,4 +48,31 @@ export const getNextBackoff = (backoff: number | number[], msg: JsMsg) => {
     return backoff[msg.info.redeliveryCount - 1] || backoff.at(-1)
   }
   return backoff
+}
+
+/**
+ * Call fn on an interval.
+ */
+export const repeater = (fn: () => void, interval: number) => {
+  let timer: NodeJS.Timer
+  const start = () => {
+    fn()
+    timer = setInterval(fn, interval)
+  }
+  const stop = () => {
+    clearInterval(timer)
+  }
+  return { start, stop }
+}
+
+/**
+ * Calculate elapsed time in milliseconds.
+ */
+export const stopwatch = () => {
+  let startTime: number
+  const start = () => {
+    startTime = new Date().getTime()
+  }
+  const stop = () => new Date().getTime() - startTime
+  return { start, stop }
 }

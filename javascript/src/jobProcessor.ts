@@ -10,9 +10,15 @@ import {
   ReplayPolicy,
   RetentionPolicy,
   StorageType,
-  Nanos,
 } from 'nats'
-import { nanos, defer, getNextBackoff, nanosToMs } from './util'
+import {
+  nanos,
+  defer,
+  getNextBackoff,
+  nanosToMs,
+  repeater,
+  stopwatch,
+} from './util'
 import _debug from 'debug'
 import { Deferred, JobDef, StopFn, Events } from './types'
 import _ from 'lodash/fp'
@@ -81,20 +87,7 @@ const createConsumer = (conn: NatsConnection, def: JobDef) => {
   })
 }
 
-const extendAckTimeoutThresholdFactor = 0.75
-/**
- * Automatically extend the ack timeout by periodically telling NATS
- * we're working.
- */
-const extendAckTimeout = (ackWait: Nanos, msg: JsMsg): NodeJS.Timer => {
-  const intervalMs = nanosToMs(ackWait) * extendAckTimeoutThresholdFactor
-  return setInterval(() => {
-    debug('extend ack - wait: %d msg: %O', ackWait, msg.info)
-    msg.working()
-  }, intervalMs)
-}
-
-const getDuration = (startTime: number) => new Date().getTime() - startTime
+const extendAckTimeoutThresholdFactor = 0.8
 
 /**
  * Call `start` to begin processing jobs based on def. To
@@ -107,95 +100,145 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
   const stopFns: StopFn[] = []
   const emitter = new EventEmitter<Events>()
   const emit = (event: Events, data: object) => {
+    debug(`${event} %O`, data)
     emitter.emit(event, { type: event, ...data })
   }
 
   const start = (def: JobDef) => {
+    emit('start', def)
     const abortController = new AbortController()
-    let timer: NodeJS.Timer
     let deferred: Deferred<void>
+    // Flag that indicates the stop function was called
+    let stopping = false
+    // Pull messages repeatedly
+    let puller: ReturnType<typeof repeater>
+    // How often to pull down messages from the consumer
+    const pullInterval = def.pullInterval ?? ms('30s')
+    // How long to wait for the batch of messages
+    const expires = pullInterval - 500
+    // Retry a failed message after a second by default
+    const backoff = def.backoff ?? ms('1s')
+    // Pull down 1 message by default
+    const batch = def.batch ?? 1
+    // Consumer config
+    const consumerConfig = consumerDefaults(def)
+
+    /**
+     * Automatically extend the ack timeout by periodically telling NATS
+     * we're working.
+     */
+    const extendAckTimeout = (msg: JsMsg) => {
+      if (def.autoExtendAckTimeout) {
+        const ackWait = consumerConfig.ack_wait
+        const intervalMs = nanosToMs(ackWait) * extendAckTimeoutThresholdFactor
+        return setInterval(() => {
+          emit('working', { ...getMetadata(msg), intervalMs })
+          msg.working()
+        }, intervalMs)
+      }
+    }
+
+    const handleTimeout = (msg: JsMsg) => {
+      const timeoutMs = def.timeoutMs
+      if (timeoutMs) {
+        return setTimeout(() => {
+          emit('timeout', { ...getMetadata(msg), timeoutMs })
+          // Abort
+          abortController.abort('timeout')
+        }, timeoutMs)
+      }
+    }
+
+    const getMetadata = (msg: JsMsg) => ({ msgInfo: msg.info, consumerConfig })
+    const areAttemptsExhausted = (msg: JsMsg) =>
+      msg.info.redeliveryCount === consumerConfig.max_deliver
+    const getExceededMs = (durationMs: number) =>
+      def.expectedMs ? durationMs - def.expectedMs : 0
 
     const run = async () => {
-      debug('job def %O', def)
-      const pullInterval = def.pullInterval ?? ms('1s')
-      // Retry a failed message after a second by default
-      const backoff = def.backoff ?? ms('1s')
-      // Pull down 10 messages by default
-      const batch = def.batch ?? 10
-      // Automatically extend the ack timeout by default
-      const autoExtendAckTimeout = def.autoExtendAckTimeout ?? true
       // Create stream
       // TODO: Maybe handle errors better
       // eslint-disable-next-line
       await createStream(conn, def).catch(() => {})
       // Create pull consumer
       const ps = await createConsumer(conn, def)
-      // Consumer config
-      const consumerConfig = consumerDefaults(def)
-      const ackWait = consumerConfig.ack_wait
       // Pull messages from the consumer
-      const pull = () => {
-        ps.pull({ batch, expires: pullInterval })
-      }
-      // Do the initial pull
-      pull()
-      // Pull regularly
-      timer = setInterval(pull, pullInterval)
+      puller = repeater(() => {
+        emit('pull', { consumerConfig, batch, expires })
+        ps.pull({ batch, expires })
+      }, pullInterval)
+      // Pull the next message(s)
+      puller.start()
+      // Stopwatch
+      const watch = stopwatch()
       // Consume messages
       for await (const msg of ps) {
-        const metadata = { msgInfo: msg.info, consumerConfig }
-        debug('received %O', metadata)
-        const startTime = new Date().getTime()
+        // Don't pull while processing message(s)
+        puller.stop()
+        const metadata = getMetadata(msg)
+        emit('receive', metadata)
         deferred = defer()
         // Auto-extend ack timeout
-        const extendAckTimer =
-          autoExtendAckTimeout && extendAckTimeout(ackWait, msg)
+        const extendAckTimer = extendAckTimeout(msg)
+        // Handle timeout
+        const timeoutTimeout = handleTimeout(msg)
+        // Start job stopwatch
+        watch.start()
+
         try {
-          emit('start', metadata)
           // Process the message
           await def.perform(msg, { signal: abortController.signal, def, js })
-          debug('completed')
-          const durationMs = getDuration(startTime)
-          emit('complete', { ...metadata, durationMs })
-          // Ack message
-          await msg.ackAck()
+          const durationMs = watch.stop()
+          emit('complete', {
+            ...metadata,
+            durationMs,
+            exceededMs: getExceededMs(durationMs),
+          })
+          // Ack message and wait for NATS to ack the ack
+          const succeeded = await msg.ackAck()
+          // Ack failed
+          if (!succeeded) {
+            emit('noAck', metadata)
+          }
         } catch (e) {
-          debug('error %O', e)
-          const durationMs = getDuration(startTime)
           const backoffMs = getNextBackoff(backoff, msg)
-          const attemptsExhausted =
-            msg.info.redeliveryCount === consumerConfig.max_deliver
+          const durationMs = watch.stop()
           emit('error', {
             ...metadata,
-            attemptsExhausted,
+            attemptsExhausted: areAttemptsExhausted(msg),
             durationMs,
             backoffMs,
+            exceededMs: getExceededMs(durationMs),
             error: e,
           })
-          debug('next backoff ms %d', backoffMs)
           // Negative ack message with backoff
           msg.nak(backoffMs)
         } finally {
-          // Clear auto-extend timer
-          if (extendAckTimer) {
-            clearInterval(extendAckTimer)
-          }
+          // Clear timeout timeout
+          clearTimeout(timeoutTimeout)
+          // Clear ack_wait delay timer
+          clearInterval(extendAckTimer)
           deferred.done()
         }
-        // Don't process any more messages if stopping
-        if (abortController.signal.aborted) {
+        // Don't process any more messages
+        if (stopping) {
           return
         }
+        // Pull the next message(s)
+        puller.start()
       }
     }
 
-    const stop = () => {
+    const stop = async () => {
+      emit('stop', { consumerConfig })
+      // Set this to true so we don't process any more messages
+      stopping = true
+      // Don't pull new messages
+      puller?.stop()
       // Send abort signal to perform
-      abortController.abort()
-      // Don't pull any more messages
-      clearInterval(timer)
+      abortController.abort('stop')
       // Wait for current message to finish processing
-      return deferred?.promise
+      await deferred?.promise
     }
     // Track all stop fns so we can shutdown with one call
     stopFns.push(stop)
@@ -223,7 +266,11 @@ export const jobProcessor = async (opts?: ConnectionOptions) => {
   }
 
   const stop = async () => {
+    // Call stop on all jobs
     await Promise.all(stopFns.map((stop) => stop()))
+    // Remove all event listeners
+    emitter.removeAllListeners()
+    // Close NATS connection
     await conn.close()
   }
   return {

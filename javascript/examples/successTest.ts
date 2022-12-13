@@ -10,33 +10,38 @@
  *
  * Requires NATS to be running.
  */
+import ms from 'ms'
 import { JsMsg } from 'nats'
 import { setTimeout } from 'node:timers/promises'
 import { jobProcessor } from '../src/jobProcessor'
+import { JobDef } from '../src/types'
 import { expBackoff } from '../src/util'
 
-const def = {
+const def: JobDef = {
   stream: 'ORDERS',
   backoff: expBackoff(1000),
   async perform(msg: JsMsg) {
     console.log(`Started ${msg.info.streamSequence}`)
     console.log(msg.data.toString())
     // Simulate work
-    await setTimeout(5000)
+    await setTimeout(ms('10s'))
     console.log(`Completed ${msg.info.streamSequence}`)
   },
+  expectedMs: ms('12s'),
 }
 const run = async () => {
   const processor = await jobProcessor()
   processor.emitter.on('start', console.info)
+  processor.emitter.on('stop', console.info)
+  processor.emitter.on('receive', console.info)
   processor.emitter.on('complete', console.info)
   processor.emitter.on('error', console.error)
+  processor.emitter.on('noAck', console.warn)
   // Start processing messages
-  const ordersJob = processor.start(def)
+  processor.start(def)
   // Gracefully handle signals
   const shutDown = async () => {
-    await ordersJob.stop()
-    process.exit(0)
+    await processor.stop()
   }
   process.on('SIGTERM', shutDown)
   process.on('SIGINT', shutDown)

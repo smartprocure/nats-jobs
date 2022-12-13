@@ -12,11 +12,11 @@
 import { JsMsg } from 'nats'
 import { setTimeout } from 'node:timers/promises'
 import { jobProcessor } from '../src/jobProcessor'
-import { PerformOpts } from '../src/types'
+import { Context } from '../src/types'
 
 const def = {
   stream: 'ORDERS',
-  async perform(msg: JsMsg, { signal }: PerformOpts) {
+  async perform(msg: JsMsg, { signal }: Context) {
     console.log(`Started ${msg.info.streamSequence}`)
     for (let i = 0; i < 5; i++) {
       await setTimeout(1000)
@@ -27,15 +27,15 @@ const def = {
     }
     console.log(`Completed ${msg.info.streamSequence}`)
   },
+  autoExtendAckTimeout: true,
 }
 const run = async () => {
   const processor = await jobProcessor()
   // Start processing messages
-  const ordersJob = processor.start(def)
+  processor.start(def)
   // Gracefully handle signals
   const shutDown = async () => {
-    await ordersJob.stop()
-    process.exit(0)
+    await processor.stop()
   }
   process.on('SIGTERM', shutDown)
   process.on('SIGINT', shutDown)

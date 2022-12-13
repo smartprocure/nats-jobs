@@ -10,6 +10,7 @@
  * Requires NATS to be running.
  */
 import ms from 'ms'
+import { setTimeout } from 'node:timers/promises'
 import { jobProcessor } from '../src/jobProcessor'
 import { expBackoff } from '../src/util'
 
@@ -28,13 +29,16 @@ const def = {
   backoff: expBackoff(ms('1s')),
   // Process message
   async perform() {
+    // Simulate work
+    await setTimeout(ms('5s'))
     throw 'fail'
   },
+  expectedMs: ms('4s'),
 }
 
 const run = async () => {
   const processor = await jobProcessor()
-  processor.emitter.on('start', console.info)
+  processor.emitter.on('receive', console.info)
   processor.emitter.on('complete', console.info)
   processor.emitter.on('error', console.error)
   processor.start(def)
