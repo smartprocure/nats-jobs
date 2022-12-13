@@ -79,6 +79,18 @@ Publish via NATS
 nats pub ORDERS someText
 ```
 
+### Strategies
+
+*Short-lived jobs*
+For short-lived jobs like sending an email you shouldn't need to enable `autoExtendTimeout`. Processing of a message should happen in less than the 10 second `ack_wait` default.
+
+*Long-lived jobs*
+Long-lived jobs should use a short `ack_wait` with `autoExtendAckTimeout` set to `true`.
+You may also want to use the `timeout` option as a sanity check. A timeout call abort on the abort signal just like calling `stop`. However, you can differntiate by checking `signal.reason` which will be set to `timeout` for a timeout and `stop` when `stop` is called. This allows the job control of how it wants to handle this situation with two likely scenarios:
+
+(1) Finish processing current record and exit.
+(2) Register an `onabort` callback that logs an error and calls `process.exit()`.
+
 ### Testing
 
 Run the following in the `/docker` directory to start up NATS.
